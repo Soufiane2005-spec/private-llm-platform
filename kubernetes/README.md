@@ -72,3 +72,12 @@ curl http://localhost/
 ```
 
 On Docker Desktop for Windows, the internal LoadBalancer IP may not be directly reachable from the host. Use `localhost` for local validation.
+## Persistent Model Storage
+
+The platform uses a PersistentVolumeClaim to preserve downloaded LLM models across pod restarts.
+
+Deploy the model storage:
+
+```bash
+kubectl apply -f kubernetes/local/model-storage-pvc.yaml
+kubectl get pvc -n llm-platform
