@@ -1,0 +1,60 @@
+name: Infrastructure CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+    paths:
+      - "kubernetes/**"
+      - ".yamllint.yaml"
+      - ".github/workflows/infrastructure-ci.yaml"
+  push:
+    branches:
+      - develop
+    paths:
+      - "kubernetes/**"
+      - ".yamllint.yaml"
+      - ".github/workflows/infrastructure-ci.yaml"
+
+permissions:
+  contents: read
+
+jobs:
+  yaml-lint:
+    name: Validate YAML formatting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install yamllint
+        run: pip install yamllint==1.35.1
+
+      - name: Validate Kubernetes YAML
+        run: yamllint -c .yamllint.yaml kubernetes
+
+  secret-file-check:
+    name: Prevent committed secret files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check tracked secret manifests
+        shell: bash
+        run: |
+          if git ls-files "*.secret.yaml" | grep -q .; then
+            echo "Real Kubernetes secret manifests must not be committed."
+            git ls-files "*.secret.yaml"
+            exit 1
+          fi
+
+          echo "No tracked .secret.yaml files found."
