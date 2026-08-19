@@ -47,3 +47,5 @@ dist/
 # Temporary
 tmp/
 temp/
+# Kubernetes secret manifests
+*.secret.yaml
