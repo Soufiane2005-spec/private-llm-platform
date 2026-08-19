@@ -28,3 +28,47 @@ Files:
 kubectl apply -f kubernetes/local/namespace.yaml
 kubectl apply -f kubernetes/local/test-app-deployment.yaml
 kubectl apply -f kubernetes/local/test-app-service.yaml
+```
+
+## NGINX Ingress Controller
+
+NGINX Ingress Controller routes external HTTP traffic to Kubernetes services.
+
+Install Helm, then deploy the controller:
+
+```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  --namespace ingress-nginx \
+  --create-namespace \
+  --version 4.15.1
+```
+
+Validate the controller:
+
+```bash
+kubectl rollout status deployment/ingress-nginx-controller \
+  -n ingress-nginx \
+  --timeout=180s
+
+kubectl get pods -n ingress-nginx
+kubectl get ingressclass
+```
+
+## Local Test Ingress
+
+Deploy the test application Ingress:
+
+```bash
+kubectl apply -f kubernetes/local/test-app-ingress.yaml
+kubectl get ingress -n llm-platform
+```
+
+Test HTTP routing:
+
+```bash
+curl http://localhost/
+```
+
+On Docker Desktop for Windows, the internal LoadBalancer IP may not be directly reachable from the host. Use `localhost` for local validation.
