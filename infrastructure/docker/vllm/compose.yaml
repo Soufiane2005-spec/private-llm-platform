@@ -1,0 +1,63 @@
+
+name: private-llm-platform-vllm
+
+services:
+  vllm:
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:v0.27.0}
+    restart: unless-stopped
+    ipc: host
+
+    ports:
+      - "127.0.0.1:${VLLM_PORT:-8000}:8000"
+
+    environment:
+        HF_TOKEN: "${HF_TOKEN:-}"
+        VLLM_LOGGING_LEVEL: "${VLLM_LOGGING_LEVEL:-INFO}"
+        VLLM_USE_V2_MODEL_RUNNER: "${VLLM_USE_V2_MODEL_RUNNER:-0}"
+
+    command:
+      - --model
+      - ${VLLM_MODEL:-Qwen/Qwen3-0.6B}
+      - --served-model-name
+      - ${VLLM_SERVED_MODEL_NAME:-qwen3-0.6b}
+      - --dtype
+      - ${VLLM_DTYPE:-half}
+      - --gpu-memory-utilization
+      - ${VLLM_GPU_MEMORY_UTILIZATION:-0.80}
+      - --max-model-len
+      - ${VLLM_MAX_MODEL_LEN:-1024}
+      - --max-num-seqs
+      - ${VLLM_MAX_NUM_SEQS:-1}
+      - --enforce-eager
+
+    volumes:
+      - vllm_hf_cache:/root/.cache/huggingface
+
+    deploy:
+      resources:
+        limits:
+          cpus: "8.0"
+          memory: 10G
+
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"
+      interval: 15s
+      timeout: 5s
+      retries: 40
+      start_period: 10m
+
+    networks:
+      - vllm_backend
+
+volumes:
+  vllm_hf_cache:
+    name: private-llm-vllm-hf-cache
+
+networks:
+  vllm_backend:
+    name: private-llm-vllm-backend
+    driver: bridge
