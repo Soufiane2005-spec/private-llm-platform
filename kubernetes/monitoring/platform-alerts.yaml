@@ -1,0 +1,56 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: llm-platform-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+spec:
+  groups:
+    - name: llm-platform.rules
+      rules:
+        - alert: LLMPlatformDeploymentUnavailable
+          expr: |
+            kube_deployment_status_replicas_available{namespace="llm-platform"}
+            <
+            kube_deployment_spec_replicas{namespace="llm-platform"}
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Deployment unavailable in llm-platform"
+            description: "Deployment {{ $labels.deployment }} has unavailable replicas."
+
+        - alert: LLMPlatformPodRestarting
+          expr: |
+            increase(kube_pod_container_status_restarts_total{namespace="llm-platform"}[10m]) > 3
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Pod restarting repeatedly"
+            description: "Pod {{ $labels.pod }} restarted more than three times in ten minutes."
+
+        - alert: LLMPlatformPVCPending
+          expr: |
+            kube_persistentvolumeclaim_status_phase{namespace="llm-platform",phase="Pending"} == 1
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "PersistentVolumeClaim is pending"
+            description: "PVC {{ $labels.persistentvolumeclaim }} has been pending for more than ten minutes."
+
+        - alert: LLMPlatformStorageAlmostFull
+          expr: |
+            (
+              kubelet_volume_stats_used_bytes{namespace="llm-platform"}
+              /
+              kubelet_volume_stats_capacity_bytes{namespace="llm-platform"}
+            ) * 100 > 85
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Persistent storage is almost full"
+            description: "PVC {{ $labels.persistentvolumeclaim }} is more than 85% full."
