@@ -19,9 +19,13 @@ def create_app() -> FastAPI:
     )
 
     register_exception_handlers(app)
+    from interfaces.http.routes.engines import (
+    router as engines_router,
+)
 
 
     app.include_router(health_router)
+    app.include_router(engines_router)
 
     return app
 
