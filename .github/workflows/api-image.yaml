@@ -1,0 +1,46 @@
+name: API Container Image
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - "services/api/**"
+      - ".github/workflows/api-image.yaml"
+  pull_request:
+    branches:
+      - develop
+    paths:
+      - "services/api/**"
+      - ".github/workflows/api-image.yaml"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build API image
+        run: |
+          docker build \
+            -t ghcr.io/${{ github.repository_owner }}/private-llm-api:${{ github.sha }} \
+            services/api
+
+      - name: Push API image
+        if: github.event_name == 'push'
+        run: |
+          docker push ghcr.io/${{ github.repository_owner }}/private-llm-api:${{ github.sha }}
