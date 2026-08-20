@@ -60,7 +60,8 @@ kubectl get nodes -o custom-columns="NAME:.metadata.name,GPU:.status.allocatable
 kubectl get storageclass
 kubectl get crd
 helm version
-Get-Command jq -ErrorAction SilentlyContinue```
+Get-Command jq -ErrorAction SilentlyContinue
+```
 
 The preflight check passes only when:
 
