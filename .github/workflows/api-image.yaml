@@ -37,10 +37,10 @@ jobs:
       - name: Build API image
         run: |
           docker build \
-            -t ghcr.io/${{ github.repository_owner }}/private-llm-api:${{ github.sha }} \
+            -t ghcr.io/soufiane2005-spec/private-llm-api:${{ github.sha }} \
             services/api
 
       - name: Push API image
         if: github.event_name == 'push'
         run: |
-          docker push ghcr.io/${{ github.repository_owner }}/private-llm-api:${{ github.sha }}
+          docker push ghcr.io/soufiane2005-spec/private-llm-api:${{ github.sha }}
