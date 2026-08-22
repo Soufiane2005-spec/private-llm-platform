@@ -57,3 +57,51 @@ def test_failed_job_requires_error() -> None:
             job_type="benchmark",
             status=JobStatus.FAILED,
         )
+def test_pending_job_can_start_running() -> None:
+    job = Job(
+        job_id="job-1",
+        job_type="inference",
+    )
+
+    running = job.mark_running()
+
+    assert running.status is JobStatus.RUNNING
+    assert job.status is JobStatus.PENDING
+
+
+def test_running_job_can_complete() -> None:
+    job = Job(
+        job_id="job-1",
+        job_type="inference",
+        status=JobStatus.RUNNING,
+    )
+
+    completed = job.mark_completed()
+
+    assert completed.status is JobStatus.COMPLETED
+
+
+def test_running_job_can_fail() -> None:
+    job = Job(
+        job_id="job-1",
+        job_type="inference",
+        status=JobStatus.RUNNING,
+    )
+
+    failed = job.mark_failed("model unavailable")
+
+    assert failed.status is JobStatus.FAILED
+    assert failed.error == "model unavailable"
+
+
+def test_pending_job_cannot_complete() -> None:
+    job = Job(
+        job_id="job-1",
+        job_type="inference",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="only running jobs can complete",
+    ):
+        job.mark_completed()

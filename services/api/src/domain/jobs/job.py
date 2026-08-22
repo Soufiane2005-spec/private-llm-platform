@@ -1,6 +1,6 @@
 """Domain models for asynchronous jobs."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 
@@ -33,3 +33,42 @@ class Job:
 
         if self.status is JobStatus.FAILED and not self.error:
             raise ValueError("failed jobs must contain an error.")
+
+    def mark_running(self) -> "Job":
+        """Return the job in the running state."""
+
+        if self.status is not JobStatus.PENDING:
+            raise ValueError("only pending jobs can start running.")
+
+        return replace(
+            self,
+            status=JobStatus.RUNNING,
+            error=None,
+        )
+
+    def mark_completed(self) -> "Job":
+        """Return the job in the completed state."""
+
+        if self.status is not JobStatus.RUNNING:
+            raise ValueError("only running jobs can complete.")
+
+        return replace(
+            self,
+            status=JobStatus.COMPLETED,
+            error=None,
+        )
+
+    def mark_failed(self, error: str) -> "Job":
+        """Return the job in the failed state."""
+
+        if self.status is not JobStatus.RUNNING:
+            raise ValueError("only running jobs can fail.")
+
+        if not error.strip():
+            raise ValueError("failed jobs must contain an error.")
+
+        return replace(
+            self,
+            status=JobStatus.FAILED,
+            error=error,
+        )
