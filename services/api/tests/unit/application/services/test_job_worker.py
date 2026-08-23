@@ -1,3 +1,7 @@
+import time
+
+import pytest
+
 from application.services.job_worker import JobWorker
 from domain.jobs.job import Job, JobStatus
 from infrastructure.persistence.in_memory_job_repository import (
@@ -155,3 +159,82 @@ def test_worker_can_retry_then_complete_job() -> None:
 
     assert repository.get(job.job_id) == second_result
     assert queue.size() == 0
+
+
+def test_worker_requeues_timed_out_job_when_retry_available() -> None:
+    queue = InMemoryJobQueue()
+    repository = InMemoryJobRepository()
+
+    job = Job(
+        job_id="job-timeout",
+        job_type="inference",
+        max_attempts=3,
+    )
+
+    queue.enqueue(job)
+    repository.save(job)
+
+    def slow_handler(job: Job) -> None:
+        time.sleep(0.1)
+
+    worker = JobWorker(
+        queue,
+        repository,
+        slow_handler,
+        timeout_seconds=0.01,
+    )
+
+    result = worker.run_once()
+
+    assert result is not None
+    assert result.status is JobStatus.PENDING
+    assert result.attempts == 1
+    assert queue.size() == 1
+    assert repository.get(job.job_id) == result
+
+
+def test_worker_marks_timed_out_job_failed_on_last_attempt() -> None:
+    queue = InMemoryJobQueue()
+    repository = InMemoryJobRepository()
+
+    job = Job(
+        job_id="job-timeout",
+        job_type="inference",
+        max_attempts=1,
+    )
+
+    queue.enqueue(job)
+    repository.save(job)
+
+    def slow_handler(job: Job) -> None:
+        time.sleep(0.1)
+
+    worker = JobWorker(
+        queue,
+        repository,
+        slow_handler,
+        timeout_seconds=0.01,
+    )
+
+    result = worker.run_once()
+
+    assert result is not None
+    assert result.status is JobStatus.FAILED
+    assert result.attempts == 1
+    assert result.error is not None
+    assert "exceeded timeout" in result.error
+    assert queue.size() == 0
+    assert repository.get(job.job_id) == result
+
+
+def test_worker_rejects_non_positive_timeout() -> None:
+    with pytest.raises(
+        ValueError,
+        match="timeout_seconds must be greater than zero",
+    ):
+        JobWorker(
+            InMemoryJobQueue(),
+            InMemoryJobRepository(),
+            lambda job: None,
+            timeout_seconds=0,
+        )
