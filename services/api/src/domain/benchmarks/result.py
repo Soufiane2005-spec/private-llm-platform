@@ -10,6 +10,8 @@ class BenchmarkResult:
     prompt_id: str
     engine: str
     latency_ms: float
+    tokens_generated: int = 0
+    duration_seconds: float = 0.0
 
     def __post_init__(self) -> None:
         """Validate benchmark result invariants."""
@@ -22,3 +24,24 @@ class BenchmarkResult:
 
         if self.latency_ms < 0:
             raise ValueError("latency_ms cannot be negative.")
+
+        if self.tokens_generated < 0:
+            raise ValueError("tokens_generated cannot be negative.")
+
+        if self.duration_seconds < 0:
+            raise ValueError("duration_seconds cannot be negative.")
+
+        if self.tokens_generated > 0 and self.duration_seconds <= 0:
+            raise ValueError(
+                "duration_seconds must be greater than zero "
+                "when tokens are generated."
+            )
+
+    @property
+    def throughput_tokens_per_second(self) -> float:
+        """Return generated-token throughput."""
+
+        if self.tokens_generated == 0:
+            return 0.0
+
+        return self.tokens_generated / self.duration_seconds
