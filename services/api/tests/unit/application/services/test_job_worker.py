@@ -16,7 +16,7 @@ def test_worker_returns_none_when_queue_is_empty() -> None:
     assert worker.run_once() is None
 
 
-def test_worker_persists_completed_job() -> None:
+def test_worker_completes_successful_job() -> None:
     queue = InMemoryJobQueue()
     repository = InMemoryJobRepository()
 
@@ -24,6 +24,7 @@ def test_worker_persists_completed_job() -> None:
         job_id="job-1",
         job_type="inference",
     )
+
     queue.enqueue(job)
     repository.save(job)
 
@@ -37,17 +38,55 @@ def test_worker_persists_completed_job() -> None:
 
     assert result is not None
     assert result.status is JobStatus.COMPLETED
+    assert result.attempts == 1
     assert repository.get(job.job_id) == result
+    assert queue.size() == 0
 
 
-def test_worker_persists_failed_job() -> None:
+def test_worker_requeues_failed_job_when_retry_available() -> None:
     queue = InMemoryJobQueue()
     repository = InMemoryJobRepository()
 
     job = Job(
         job_id="job-1",
         job_type="inference",
+        max_attempts=3,
     )
+
+    queue.enqueue(job)
+    repository.save(job)
+
+    def failing_handler(job: Job) -> None:
+        raise RuntimeError("model execution failed")
+
+    worker = JobWorker(
+        queue,
+        repository,
+        failing_handler,
+    )
+
+    result = worker.run_once()
+
+    assert result is not None
+    assert result.status is JobStatus.PENDING
+    assert result.attempts == 1
+    assert result.can_retry is True
+
+    assert repository.get(job.job_id) == result
+    assert queue.size() == 1
+    assert queue.dequeue() == result
+
+
+def test_worker_marks_job_failed_after_last_attempt() -> None:
+    queue = InMemoryJobQueue()
+    repository = InMemoryJobRepository()
+
+    job = Job(
+        job_id="job-1",
+        job_type="inference",
+        max_attempts=1,
+    )
+
     queue.enqueue(job)
     repository.save(job)
 
@@ -65,4 +104,54 @@ def test_worker_persists_failed_job() -> None:
     assert result is not None
     assert result.status is JobStatus.FAILED
     assert result.error == "model execution failed"
+    assert result.attempts == 1
+    assert result.can_retry is False
+
     assert repository.get(job.job_id) == result
+    assert queue.size() == 0
+
+
+def test_worker_can_retry_then_complete_job() -> None:
+    queue = InMemoryJobQueue()
+    repository = InMemoryJobRepository()
+
+    job = Job(
+        job_id="job-1",
+        job_type="inference",
+        max_attempts=3,
+    )
+
+    queue.enqueue(job)
+    repository.save(job)
+
+    calls = 0
+
+    def flaky_handler(job: Job) -> None:
+        nonlocal calls
+        calls += 1
+
+        if calls == 1:
+            raise RuntimeError("temporary failure")
+
+    worker = JobWorker(
+        queue,
+        repository,
+        flaky_handler,
+    )
+
+    first_result = worker.run_once()
+
+    assert first_result is not None
+    assert first_result.status is JobStatus.PENDING
+    assert first_result.attempts == 1
+    assert queue.size() == 1
+
+    second_result = worker.run_once()
+
+    assert second_result is not None
+    assert second_result.status is JobStatus.COMPLETED
+    assert second_result.attempts == 2
+    assert second_result.error is None
+
+    assert repository.get(job.job_id) == second_result
+    assert queue.size() == 0

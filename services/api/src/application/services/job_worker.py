@@ -8,7 +8,7 @@ from domain.jobs.job import Job
 
 
 class JobWorker:
-    """Consume, execute, and persist jobs from a queue."""
+    """Consume, execute, retry, and persist jobs from a queue."""
 
     def __init__(
         self,
@@ -28,14 +28,25 @@ class JobWorker:
         if job is None:
             return None
 
-        running_job = job.mark_running()
+        attempted_job = job.register_attempt()
+        running_job = attempted_job.mark_running()
+
         self._repository.save(running_job)
 
         try:
             self._handler(running_job)
         except Exception as exc:
+            if running_job.can_retry:
+                retry_job = running_job.mark_retry_pending()
+
+                self._repository.save(retry_job)
+                self._queue.enqueue(retry_job)
+
+                return retry_job
+
             failed_job = running_job.mark_failed(str(exc))
             self._repository.save(failed_job)
+
             return failed_job
 
         completed_job = running_job.mark_completed()
