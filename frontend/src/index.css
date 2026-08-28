@@ -20,6 +20,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  background: #101218;
 }
 
 button,
@@ -27,4 +28,14 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+button:focus-visible {
+  outline: 2px solid #8aa7ff;
+  outline-offset: 2px;
+}
+
+::selection {
+  background: #35415f;
+  color: #ffffff;
 }

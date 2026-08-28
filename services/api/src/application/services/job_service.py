@@ -35,3 +35,6 @@ class JobService:
         """Return a job by identifier."""
 
         return self._repository.get(job_id)
+    def list_jobs(self) -> tuple[Job, ...]:
+        """Return all tracked jobs."""
+        return self._repository.list()

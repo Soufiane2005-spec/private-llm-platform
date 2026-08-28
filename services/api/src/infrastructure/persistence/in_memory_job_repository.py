@@ -16,3 +16,9 @@ class InMemoryJobRepository:
     def get(self, job_id: str) -> Job | None:
         """Return a job by identifier."""
         return self._jobs.get(job_id)
+    def list(self) -> tuple[Job, ...]:
+        """Return all jobs in deterministic order."""
+        return tuple(
+        self._jobs[job_id]
+        for job_id in sorted(self._jobs)
+    )
