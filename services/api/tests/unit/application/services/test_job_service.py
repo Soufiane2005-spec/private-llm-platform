@@ -1,10 +1,23 @@
 from application.services.job_service import JobService
-from domain.jobs.job import JobStatus
+from domain.jobs.job import Job, JobStatus
 from infrastructure.persistence.in_memory_job_repository import (
     InMemoryJobRepository,
 )
 from infrastructure.queue.in_memory_job_queue import InMemoryJobQueue
 
+
+def test_list_jobs_returns_repository_jobs() -> None:
+    queue = InMemoryJobQueue()
+    repository = InMemoryJobRepository()
+    service = JobService(queue=queue, repository=repository)
+
+    first = Job(job_id="job-a", job_type="inference")
+    second = Job(job_id="job-b", job_type="benchmark")
+
+    repository.save(first)
+    repository.save(second)
+
+    assert service.list_jobs() == (first, second)
 
 def test_submit_creates_and_persists_pending_job() -> None:
     queue = InMemoryJobQueue()

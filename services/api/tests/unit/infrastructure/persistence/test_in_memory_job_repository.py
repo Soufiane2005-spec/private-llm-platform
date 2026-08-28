@@ -37,3 +37,12 @@ def test_repository_replaces_existing_job_state() -> None:
     repository.save(running)
 
     assert repository.get("job-1") == running
+def test_list_returns_jobs_in_deterministic_order() -> None:
+    repository = InMemoryJobRepository()
+
+    repository.save(Job(job_id="job-b", job_type="benchmark"))
+    repository.save(Job(job_id="job-a", job_type="inference"))
+
+    jobs = repository.list()
+
+    assert [job.job_id for job in jobs] == ["job-a", "job-b"]

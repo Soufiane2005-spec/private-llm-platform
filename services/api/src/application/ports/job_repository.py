@@ -15,3 +15,6 @@ class JobRepository(Protocol):
     def get(self, job_id: str) -> Job | None:
         """Return a job by identifier."""
         ...
+    def list(self) -> tuple[Job, ...]:
+        """Return all jobs in deterministic order."""
+    ...
