@@ -424,6 +424,10 @@ h1 {
     width: min(100% - 28px, 1180px);
     padding: 24px 0 36px;
   }
+  .monitoring-resource-grid,
+.engine-status-grid {
+  grid-template-columns: 1fr;
+}
 
   .topbar {
     align-items: flex-start;
@@ -472,10 +476,134 @@ h1 {
   .benchmark-performance {
     grid-template-columns: 1fr;
   }
+  .engine-status-card {
+  align-items: flex-start;
+  flex-direction: column;
+}
 
   .model-card-header,
   .job-card-header,
   .benchmark-card-header {
     flex-direction: column;
   }
+}
+.monitoring-resource-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.resource-card {
+  padding: 24px;
+  border: 1px solid #292e3c;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 2%), transparent),
+    #171a22;
+}
+
+.resource-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.resource-card-header span {
+  color: #8b93a7;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.resource-card-header strong {
+  color: #f7f8fb;
+  font-size: 1.9rem;
+}
+
+.resource-track {
+  height: 8px;
+  margin-top: 22px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #252a35;
+}
+
+.resource-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #8ea7ff;
+  transition: width 250ms ease;
+}
+
+.resource-card p {
+  margin: 14px 0 0;
+  color: #7f879a;
+  font-size: 0.82rem;
+}
+
+.monitoring-engine-heading {
+  margin-top: 44px;
+}
+
+.engine-status-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.engine-status-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid #292e3c;
+  border-radius: 18px;
+  background: #171a22;
+}
+
+.engine-status-label {
+  margin: 0;
+  color: #757d91;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.engine-status-card h3 {
+  margin: 6px 0 0;
+  color: #f7f8fb;
+  font-size: 1.35rem;
+}
+
+.runtime-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.runtime-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+.runtime-available {
+  background: #17372c;
+  color: #77e0b5;
+}
+
+.runtime-unavailable {
+  background: #3a2427;
+  color: #f39a9a;
+}
+
+.runtime-unknown {
+  background: #302c20;
+  color: #e4c768;
 }

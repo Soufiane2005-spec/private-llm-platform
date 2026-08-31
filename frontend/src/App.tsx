@@ -7,14 +7,16 @@ import {
 } from './api/benchmarks'
 import { fetchJobs } from './api/job'
 import { fetchModels } from './api/models'
+import { fetchMonitoringDashboard } from './api/monitoring'
 import type {
   BenchmarkRecord,
   BenchmarkReport,
 } from './types/benchmark'
 import type { Job, JobStatus } from './types/job'
 import type { ModelCatalogEntry } from './types/model'
+import type { MonitoringDashboard } from './types/monitoring'
 
-type View = 'models' | 'jobs' | 'benchmarks'
+type View = 'models' | 'jobs' | 'benchmarks' | 'monitoring'
 
 function App() {
   const [view, setView] = useState<View>('models')
@@ -32,6 +34,11 @@ function App() {
     useState<BenchmarkReport | null>(null)
   const [benchmarksLoading, setBenchmarksLoading] = useState(true)
   const [benchmarksError, setBenchmarksError] = useState<string | null>(null)
+
+  const [monitoring, setMonitoring] =
+    useState<MonitoringDashboard | null>(null)
+  const [monitoringLoading, setMonitoringLoading] = useState(true)
+  const [monitoringError, setMonitoringError] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadModels() {
@@ -89,6 +96,25 @@ function App() {
     void loadBenchmarks()
   }, [])
 
+  useEffect(() => {
+    async function loadMonitoring() {
+      try {
+        const data = await fetchMonitoringDashboard()
+        setMonitoring(data)
+      } catch (err) {
+        setMonitoringError(
+          err instanceof Error
+            ? err.message
+            : 'Unable to load monitoring data.',
+        )
+      } finally {
+        setMonitoringLoading(false)
+      }
+    }
+
+    void loadMonitoring()
+  }, [])
+
   const enabledModels = useMemo(
     () => models.filter((model) => model.enabled).length,
     [models],
@@ -137,6 +163,13 @@ function App() {
           >
             Benchmarks
           </NavigationButton>
+
+          <NavigationButton
+            active={view === 'monitoring'}
+            onClick={() => setView('monitoring')}
+          >
+            Monitoring
+          </NavigationButton>
         </nav>
       </header>
 
@@ -164,6 +197,14 @@ function App() {
           report={benchmarkReport}
           loading={benchmarksLoading}
           error={benchmarksError}
+        />
+      )}
+
+      {view === 'monitoring' && (
+        <MonitoringView
+          monitoring={monitoring}
+          loading={monitoringLoading}
+          error={monitoringError}
         />
       )}
     </main>
@@ -481,6 +522,102 @@ function BenchmarksView({
   )
 }
 
+interface MonitoringViewProps {
+  monitoring: MonitoringDashboard | null
+  loading: boolean
+  error: string | null
+}
+
+function MonitoringView({
+  monitoring,
+  loading,
+  error,
+}: MonitoringViewProps) {
+  return (
+    <>
+      <section className="hero">
+        <div>
+          <p className="eyebrow">Platform observability</p>
+          <h1>Monitoring UI</h1>
+          <p className="hero-copy">
+            Monitor system resource utilization and runtime status of the LLM
+            inference engines.
+          </p>
+        </div>
+
+        <SummaryCard
+          label="Engines"
+          value={monitoring?.engines.length ?? 0}
+        />
+      </section>
+
+      <section className="content">
+        {loading && (
+          <LoadingState message="Loading monitoring data..." />
+        )}
+
+        {error && (
+          <ErrorState
+            title="Unable to load monitoring data"
+            message={error}
+          />
+        )}
+
+        {!loading && !error && monitoring && (
+          <>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Resources</p>
+                <h2>System Usage</h2>
+              </div>
+
+              <span className="status">Live snapshot</span>
+            </div>
+
+            <div className="monitoring-resource-grid">
+              <ResourceCard
+                label="CPU"
+                value={monitoring.resources.cpu_percent}
+              />
+
+              <ResourceCard
+                label="Memory"
+                value={monitoring.resources.memory_percent}
+              />
+
+              <ResourceCard
+                label="GPU"
+                value={monitoring.resources.gpu_percent}
+              />
+            </div>
+
+            <div className="section-heading monitoring-engine-heading">
+              <div>
+                <p className="eyebrow">Inference engines</p>
+                <h2>Engine Status</h2>
+              </div>
+
+              <span className="status">
+                {monitoring.engines.length} configured
+              </span>
+            </div>
+
+            <div className="engine-status-grid">
+              {monitoring.engines.map((engine) => (
+                <EngineStatusCard
+                  key={engine.engine}
+                  engine={engine.engine}
+                  status={engine.status}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+    </>
+  )
+}
+
 function BenchmarkSummary({
   report,
 }: {
@@ -616,6 +753,73 @@ function BenchmarkCard({
   )
 }
 
+function ResourceCard({
+  label,
+  value,
+}: {
+  label: string
+  value: number | null
+}) {
+  const normalizedValue =
+    value === null
+      ? null
+      : Math.max(0, Math.min(value, 100))
+
+  return (
+    <article className="resource-card">
+      <div className="resource-card-header">
+        <span>{label}</span>
+
+        <strong>
+          {normalizedValue === null
+            ? 'N/A'
+            : `${formatNumber(normalizedValue)}%`}
+        </strong>
+      </div>
+
+      <div className="resource-track">
+        <div
+          className="resource-fill"
+          style={{
+            width:
+              normalizedValue === null
+                ? '0%'
+                : `${normalizedValue}%`,
+          }}
+        />
+      </div>
+
+      <p>
+        {normalizedValue === null
+          ? 'Metric not available'
+          : getResourceState(normalizedValue)}
+      </p>
+    </article>
+  )
+}
+
+function EngineStatusCard({
+  engine,
+  status,
+}: {
+  engine: string
+  status: string
+}) {
+  return (
+    <article className="engine-status-card">
+      <div>
+        <p className="engine-status-label">Inference engine</p>
+        <h3>{engine.toUpperCase()}</h3>
+      </div>
+
+      <span className={`runtime-status runtime-${status}`}>
+        <span className="runtime-status-dot" />
+        {formatRuntimeStatus(status)}
+      </span>
+    </article>
+  )
+}
+
 function SummaryCard({
   label,
   value,
@@ -709,6 +913,29 @@ function formatJobType(jobType: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
+}
+
+function formatRuntimeStatus(status: string) {
+  return status
+    .split(/[-_]/)
+    .filter(Boolean)
+    .map(
+      (part) =>
+        part.charAt(0).toUpperCase() + part.slice(1),
+    )
+    .join(' ')
+}
+
+function getResourceState(value: number) {
+  if (value >= 85) {
+    return 'High utilization'
+  }
+
+  if (value >= 60) {
+    return 'Moderate utilization'
+  }
+
+  return 'Normal utilization'
 }
 
 function formatNumber(value: number) {
