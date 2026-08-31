@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
 
+import {
+  fetchBenchmarkReport,
+  fetchBenchmarks,
+} from './api/benchmarks'
 import { fetchJobs } from './api/job'
 import { fetchModels } from './api/models'
+import type {
+  BenchmarkRecord,
+  BenchmarkReport,
+} from './types/benchmark'
 import type { Job, JobStatus } from './types/job'
 import type { ModelCatalogEntry } from './types/model'
 
-type View = 'models' | 'jobs'
+type View = 'models' | 'jobs' | 'benchmarks'
 
 function App() {
   const [view, setView] = useState<View>('models')
@@ -18,6 +26,12 @@ function App() {
   const [jobs, setJobs] = useState<Job[]>([])
   const [jobsLoading, setJobsLoading] = useState(true)
   const [jobsError, setJobsError] = useState<string | null>(null)
+
+  const [benchmarks, setBenchmarks] = useState<BenchmarkRecord[]>([])
+  const [benchmarkReport, setBenchmarkReport] =
+    useState<BenchmarkReport | null>(null)
+  const [benchmarksLoading, setBenchmarksLoading] = useState(true)
+  const [benchmarksError, setBenchmarksError] = useState<string | null>(null)
 
   useEffect(() => {
     async function loadModels() {
@@ -53,6 +67,28 @@ function App() {
     void loadJobs()
   }, [])
 
+  useEffect(() => {
+    async function loadBenchmarks() {
+      try {
+        const [records, report] = await Promise.all([
+          fetchBenchmarks(),
+          fetchBenchmarkReport(),
+        ])
+
+        setBenchmarks(records)
+        setBenchmarkReport(report)
+      } catch (err) {
+        setBenchmarksError(
+          err instanceof Error ? err.message : 'Unable to load benchmarks.',
+        )
+      } finally {
+        setBenchmarksLoading(false)
+      }
+    }
+
+    void loadBenchmarks()
+  }, [])
+
   const enabledModels = useMemo(
     () => models.filter((model) => model.enabled).length,
     [models],
@@ -78,252 +114,579 @@ function App() {
   return (
     <main className="page">
       <header className="topbar">
-        <div>
-          <p className="platform-name">Private LLM Platform</p>
-        </div>
+        <p className="platform-name">Private LLM Platform</p>
 
         <nav className="navigation" aria-label="Platform navigation">
-          <button
-            type="button"
-            className={`nav-button ${view === 'models' ? 'nav-active' : ''}`}
+          <NavigationButton
+            active={view === 'models'}
             onClick={() => setView('models')}
           >
             Models
-          </button>
+          </NavigationButton>
 
-          <button
-            type="button"
-            className={`nav-button ${view === 'jobs' ? 'nav-active' : ''}`}
+          <NavigationButton
+            active={view === 'jobs'}
             onClick={() => setView('jobs')}
           >
             Jobs
-          </button>
+          </NavigationButton>
+
+          <NavigationButton
+            active={view === 'benchmarks'}
+            onClick={() => setView('benchmarks')}
+          >
+            Benchmarks
+          </NavigationButton>
         </nav>
       </header>
 
-      {view === 'models' ? (
-        <>
-          <section className="hero">
-            <div>
-              <p className="eyebrow">Model catalog</p>
-              <h1>Model Management</h1>
-              <p className="hero-copy">
-                View the models available on the platform and the inference
-                engine assigned to each deployment.
-              </p>
-            </div>
+      {view === 'models' && (
+        <ModelsView
+          models={models}
+          loading={modelsLoading}
+          error={modelsError}
+          enabledModels={enabledModels}
+        />
+      )}
 
-            <div className="summary-card">
-              <span>Available models</span>
-              <strong>{models.length}</strong>
-            </div>
-          </section>
+      {view === 'jobs' && (
+        <JobsView
+          jobs={jobs}
+          loading={jobsLoading}
+          error={jobsError}
+          counts={jobCounts}
+        />
+      )}
 
-          <section className="content">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Catalog</p>
-                <h2>Models</h2>
-              </div>
-
-              {!modelsLoading && !modelsError && (
-                <span className="status">
-                  {enabledModels} enabled
-                </span>
-              )}
-            </div>
-
-            {modelsLoading && (
-              <div className="state-card">
-                <p>Loading model catalog...</p>
-              </div>
-            )}
-
-            {modelsError && (
-              <div className="state-card error-card">
-                <strong>Unable to load models</strong>
-                <p>{modelsError}</p>
-              </div>
-            )}
-
-            {!modelsLoading && !modelsError && (
-              <div className="model-grid">
-                {models.map((model) => (
-                  <article className="model-card" key={model.model_id}>
-                    <div className="model-card-header">
-                      <div>
-                        <p className="model-id">{model.model_id}</p>
-                        <h3>{model.display_name}</h3>
-                      </div>
-
-                      <span
-                        className={
-                          model.enabled
-                            ? 'badge badge-enabled'
-                            : 'badge badge-disabled'
-                        }
-                      >
-                        {model.enabled ? 'Enabled' : 'Disabled'}
-                      </span>
-                    </div>
-
-                    <dl className="model-details">
-                      <div>
-                        <dt>Engine</dt>
-                        <dd>
-                          <span
-                            className={`engine-badge engine-${model.engine}`}
-                          >
-                            {model.engine}
-                          </span>
-                        </dd>
-                      </div>
-
-                      <div>
-                        <dt>Engine model</dt>
-                        <dd>{model.engine_model_id}</dd>
-                      </div>
-
-                      <div>
-                        <dt>Context length</dt>
-                        <dd>
-                          {model.context_length
-                            ? `${model.context_length.toLocaleString()} tokens`
-                            : 'Not specified'}
-                        </dd>
-                      </div>
-                    </dl>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        </>
-      ) : (
-        <>
-          <section className="hero">
-            <div>
-              <p className="eyebrow">Async processing</p>
-              <h1>Job Visualization</h1>
-              <p className="hero-copy">
-                Monitor asynchronous platform jobs, execution status, retry
-                attempts, and failures from one operational view.
-              </p>
-            </div>
-
-            <div className="summary-card">
-              <span>Tracked jobs</span>
-              <strong>{jobs.length}</strong>
-            </div>
-          </section>
-
-          <section className="content">
-            <div className="job-summary-grid">
-              <article className="job-summary-item">
-                <span>Pending</span>
-                <strong>{jobCounts.pending}</strong>
-              </article>
-
-              <article className="job-summary-item">
-                <span>Running</span>
-                <strong>{jobCounts.running}</strong>
-              </article>
-
-              <article className="job-summary-item">
-                <span>Completed</span>
-                <strong>{jobCounts.completed}</strong>
-              </article>
-
-              <article className="job-summary-item">
-                <span>Failed</span>
-                <strong>{jobCounts.failed}</strong>
-              </article>
-            </div>
-
-            <div className="section-heading jobs-heading">
-              <div>
-                <p className="eyebrow">Queue</p>
-                <h2>Jobs</h2>
-              </div>
-
-              {!jobsLoading && !jobsError && (
-                <span className="status">
-                  {jobs.length} tracked
-                </span>
-              )}
-            </div>
-
-            {jobsLoading && (
-              <div className="state-card">
-                <p>Loading jobs...</p>
-              </div>
-            )}
-
-            {jobsError && (
-              <div className="state-card error-card">
-                <strong>Unable to load jobs</strong>
-                <p>{jobsError}</p>
-              </div>
-            )}
-
-            {!jobsLoading && !jobsError && jobs.length === 0 && (
-              <div className="state-card empty-state">
-                <strong>No jobs yet</strong>
-                <p>
-                  Jobs submitted to the asynchronous processing pipeline will
-                  appear here.
-                </p>
-              </div>
-            )}
-
-            {!jobsLoading && !jobsError && jobs.length > 0 && (
-              <div className="job-grid">
-                {jobs.map((job) => (
-                  <article className="job-card" key={job.job_id}>
-                    <div className="job-card-header">
-                      <div>
-                        <p className="job-id">{job.job_id}</p>
-                        <h3>{formatJobType(job.job_type)}</h3>
-                      </div>
-
-                      <JobStatusBadge status={job.status} />
-                    </div>
-
-                    <dl className="job-details">
-                      <div>
-                        <dt>Status</dt>
-                        <dd>{formatStatus(job.status)}</dd>
-                      </div>
-
-                      <div>
-                        <dt>Attempts</dt>
-                        <dd>
-                          {job.attempts} / {job.max_attempts}
-                        </dd>
-                      </div>
-
-                      <div>
-                        <dt>Retries remaining</dt>
-                        <dd>
-                          {Math.max(job.max_attempts - job.attempts, 0)}
-                        </dd>
-                      </div>
-                    </dl>
-
-                    {job.error && (
-                      <div className="job-error">
-                        <span>Error</span>
-                        <p>{job.error}</p>
-                      </div>
-                    )}
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-        </>
+      {view === 'benchmarks' && (
+        <BenchmarksView
+          benchmarks={benchmarks}
+          report={benchmarkReport}
+          loading={benchmarksLoading}
+          error={benchmarksError}
+        />
       )}
     </main>
+  )
+}
+
+interface NavigationButtonProps {
+  active: boolean
+  onClick: () => void
+  children: string
+}
+
+function NavigationButton({
+  active,
+  onClick,
+  children,
+}: NavigationButtonProps) {
+  return (
+    <button
+      type="button"
+      className={`nav-button ${active ? 'nav-active' : ''}`}
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  )
+}
+
+interface ModelsViewProps {
+  models: ModelCatalogEntry[]
+  loading: boolean
+  error: string | null
+  enabledModels: number
+}
+
+function ModelsView({
+  models,
+  loading,
+  error,
+  enabledModels,
+}: ModelsViewProps) {
+  return (
+    <>
+      <section className="hero">
+        <div>
+          <p className="eyebrow">Model catalog</p>
+          <h1>Model Management</h1>
+          <p className="hero-copy">
+            View the models available on the platform and the inference engine
+            assigned to each deployment.
+          </p>
+        </div>
+
+        <SummaryCard label="Available models" value={models.length} />
+      </section>
+
+      <section className="content">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Catalog</p>
+            <h2>Models</h2>
+          </div>
+
+          {!loading && !error && (
+            <span className="status">{enabledModels} enabled</span>
+          )}
+        </div>
+
+        {loading && <LoadingState message="Loading model catalog..." />}
+
+        {error && (
+          <ErrorState title="Unable to load models" message={error} />
+        )}
+
+        {!loading && !error && (
+          <div className="model-grid">
+            {models.map((model) => (
+              <article className="model-card" key={model.model_id}>
+                <div className="model-card-header">
+                  <div>
+                    <p className="model-id">{model.model_id}</p>
+                    <h3>{model.display_name}</h3>
+                  </div>
+
+                  <span
+                    className={
+                      model.enabled
+                        ? 'badge badge-enabled'
+                        : 'badge badge-disabled'
+                    }
+                  >
+                    {model.enabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+
+                <dl className="model-details">
+                  <div>
+                    <dt>Engine</dt>
+                    <dd>
+                      <span
+                        className={`engine-badge engine-${model.engine}`}
+                      >
+                        {model.engine}
+                      </span>
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt>Engine model</dt>
+                    <dd>{model.engine_model_id}</dd>
+                  </div>
+
+                  <div>
+                    <dt>Context length</dt>
+                    <dd>
+                      {model.context_length
+                        ? `${model.context_length.toLocaleString()} tokens`
+                        : 'Not specified'}
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </>
+  )
+}
+
+interface JobsViewProps {
+  jobs: Job[]
+  loading: boolean
+  error: string | null
+  counts: Record<JobStatus, number>
+}
+
+function JobsView({
+  jobs,
+  loading,
+  error,
+  counts,
+}: JobsViewProps) {
+  return (
+    <>
+      <section className="hero">
+        <div>
+          <p className="eyebrow">Async processing</p>
+          <h1>Job Visualization</h1>
+          <p className="hero-copy">
+            Monitor asynchronous platform jobs, execution status, retry
+            attempts, and failures from one operational view.
+          </p>
+        </div>
+
+        <SummaryCard label="Tracked jobs" value={jobs.length} />
+      </section>
+
+      <section className="content">
+        <div className="job-summary-grid">
+          <MetricCard label="Pending" value={counts.pending} />
+          <MetricCard label="Running" value={counts.running} />
+          <MetricCard label="Completed" value={counts.completed} />
+          <MetricCard label="Failed" value={counts.failed} />
+        </div>
+
+        <div className="section-heading jobs-heading">
+          <div>
+            <p className="eyebrow">Queue</p>
+            <h2>Jobs</h2>
+          </div>
+
+          {!loading && !error && (
+            <span className="status">{jobs.length} tracked</span>
+          )}
+        </div>
+
+        {loading && <LoadingState message="Loading jobs..." />}
+
+        {error && (
+          <ErrorState title="Unable to load jobs" message={error} />
+        )}
+
+        {!loading && !error && jobs.length === 0 && (
+          <EmptyState
+            title="No jobs yet"
+            message="Jobs submitted to the asynchronous processing pipeline will appear here."
+          />
+        )}
+
+        {!loading && !error && jobs.length > 0 && (
+          <div className="job-grid">
+            {jobs.map((job) => (
+              <article className="job-card" key={job.job_id}>
+                <div className="job-card-header">
+                  <div>
+                    <p className="job-id">{job.job_id}</p>
+                    <h3>{formatJobType(job.job_type)}</h3>
+                  </div>
+
+                  <JobStatusBadge status={job.status} />
+                </div>
+
+                <dl className="job-details">
+                  <div>
+                    <dt>Status</dt>
+                    <dd>{formatStatus(job.status)}</dd>
+                  </div>
+
+                  <div>
+                    <dt>Attempts</dt>
+                    <dd>
+                      {job.attempts} / {job.max_attempts}
+                    </dd>
+                  </div>
+
+                  <div>
+                    <dt>Retries remaining</dt>
+                    <dd>
+                      {Math.max(job.max_attempts - job.attempts, 0)}
+                    </dd>
+                  </div>
+                </dl>
+
+                {job.error && (
+                  <div className="job-error">
+                    <span>Error</span>
+                    <p>{job.error}</p>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </>
+  )
+}
+
+interface BenchmarksViewProps {
+  benchmarks: BenchmarkRecord[]
+  report: BenchmarkReport | null
+  loading: boolean
+  error: string | null
+}
+
+function BenchmarksView({
+  benchmarks,
+  report,
+  loading,
+  error,
+}: BenchmarksViewProps) {
+  return (
+    <>
+      <section className="hero">
+        <div>
+          <p className="eyebrow">Performance analysis</p>
+          <h1>Benchmark UI</h1>
+          <p className="hero-copy">
+            Inspect LLM latency, token throughput, CPU, memory, and GPU
+            utilization from benchmark executions.
+          </p>
+        </div>
+
+        <SummaryCard
+          label="Benchmark runs"
+          value={report?.benchmark_count ?? benchmarks.length}
+        />
+      </section>
+
+      <section className="content">
+        {loading && <LoadingState message="Loading benchmark results..." />}
+
+        {error && (
+          <ErrorState
+            title="Unable to load benchmarks"
+            message={error}
+          />
+        )}
+
+        {!loading && !error && benchmarks.length === 0 && (
+          <EmptyState
+            title="No benchmark results yet"
+            message="Benchmark executions will appear here once results are stored by the platform."
+          />
+        )}
+
+        {!loading && !error && benchmarks.length > 0 && (
+          <>
+            {report && <BenchmarkSummary report={report} />}
+
+            <div className="section-heading benchmark-heading">
+              <div>
+                <p className="eyebrow">Executions</p>
+                <h2>Benchmark Results</h2>
+              </div>
+
+              <span className="status">
+                {benchmarks.length} result{benchmarks.length === 1 ? '' : 's'}
+              </span>
+            </div>
+
+            <div className="benchmark-grid">
+              {benchmarks.map((benchmark) => (
+                <BenchmarkCard
+                  benchmark={benchmark}
+                  key={benchmark.benchmark_id}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+    </>
+  )
+}
+
+function BenchmarkSummary({
+  report,
+}: {
+  report: BenchmarkReport
+}) {
+  return (
+    <div className="benchmark-summary-grid">
+      <MetricCard
+        label="Avg latency"
+        value={formatNumber(report.average_latency_ms)}
+        unit="ms"
+      />
+
+      <MetricCard
+        label="Avg throughput"
+        value={formatNumber(
+          report.average_throughput_tokens_per_second,
+        )}
+        unit="tok/s"
+      />
+
+      <MetricCard
+        label="Avg CPU"
+        value={formatNumber(report.average_cpu_percent)}
+        unit="%"
+      />
+
+      <MetricCard
+        label="Avg memory"
+        value={formatNumber(report.average_memory_percent)}
+        unit="%"
+      />
+
+      <MetricCard
+        label="Avg GPU"
+        value={
+          report.average_gpu_percent === null
+            ? 'N/A'
+            : formatNumber(report.average_gpu_percent)
+        }
+        unit={report.average_gpu_percent === null ? undefined : '%'}
+      />
+    </div>
+  )
+}
+
+function BenchmarkCard({
+  benchmark,
+}: {
+  benchmark: BenchmarkRecord
+}) {
+  return (
+    <article className="benchmark-card">
+      <div className="benchmark-card-header">
+        <div>
+          <p className="benchmark-id">{benchmark.benchmark_id}</p>
+          <h3>{benchmark.model_id}</h3>
+        </div>
+
+        <span
+          className={`engine-badge engine-${benchmark.engine.toLowerCase()}`}
+        >
+          {benchmark.engine}
+        </span>
+      </div>
+
+      <div className="benchmark-performance">
+        <div>
+          <span>Latency</span>
+          <strong>{formatNumber(benchmark.latency_ms)} ms</strong>
+        </div>
+
+        <div>
+          <span>Throughput</span>
+          <strong>
+            {formatNumber(benchmark.throughput_tokens_per_second)} tok/s
+          </strong>
+        </div>
+      </div>
+
+      <dl className="benchmark-details">
+        <div>
+          <dt>Prompt</dt>
+          <dd>{benchmark.prompt_id}</dd>
+        </div>
+
+        <div>
+          <dt>Tokens generated</dt>
+          <dd>{benchmark.tokens_generated.toLocaleString()}</dd>
+        </div>
+
+        <div>
+          <dt>Duration</dt>
+          <dd>{formatNumber(benchmark.duration_seconds)} s</dd>
+        </div>
+
+        <div>
+          <dt>CPU</dt>
+          <dd>{formatNumber(benchmark.resources.cpu_percent)}%</dd>
+        </div>
+
+        <div>
+          <dt>Memory</dt>
+          <dd>{formatNumber(benchmark.resources.memory_percent)}%</dd>
+        </div>
+
+        <div>
+          <dt>Memory used</dt>
+          <dd>{formatBytes(benchmark.resources.memory_used_bytes)}</dd>
+        </div>
+
+        <div>
+          <dt>GPU</dt>
+          <dd>
+            {benchmark.resources.gpu_percent === null
+              ? 'Not available'
+              : `${formatNumber(benchmark.resources.gpu_percent)}%`}
+          </dd>
+        </div>
+
+        <div>
+          <dt>GPU memory</dt>
+          <dd>
+            {benchmark.resources.gpu_memory_used_bytes === null
+              ? 'Not available'
+              : formatBytes(
+                  benchmark.resources.gpu_memory_used_bytes,
+                )}
+          </dd>
+        </div>
+      </dl>
+    </article>
+  )
+}
+
+function SummaryCard({
+  label,
+  value,
+}: {
+  label: string
+  value: number
+}) {
+  return (
+    <div className="summary-card">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  )
+}
+
+function MetricCard({
+  label,
+  value,
+  unit,
+}: {
+  label: string
+  value: string | number
+  unit?: string
+}) {
+  return (
+    <article className="metric-card">
+      <span>{label}</span>
+
+      <strong>
+        {value}
+        {unit && <small>{unit}</small>}
+      </strong>
+    </article>
+  )
+}
+
+function LoadingState({ message }: { message: string }) {
+  return (
+    <div className="state-card">
+      <p>{message}</p>
+    </div>
+  )
+}
+
+function ErrorState({
+  title,
+  message,
+}: {
+  title: string
+  message: string
+}) {
+  return (
+    <div className="state-card error-card">
+      <strong>{title}</strong>
+      <p>{message}</p>
+    </div>
+  )
+}
+
+function EmptyState({
+  title,
+  message,
+}: {
+  title: string
+  message: string
+}) {
+  return (
+    <div className="state-card empty-state">
+      <strong>{title}</strong>
+      <p>{message}</p>
+    </div>
   )
 }
 
@@ -346,6 +709,28 @@ function formatJobType(jobType: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
+}
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+function formatBytes(bytes: number) {
+  if (bytes === 0) {
+    return '0 B'
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  const unitIndex = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    units.length - 1,
+  )
+
+  const value = bytes / 1024 ** unitIndex
+
+  return `${formatNumber(value)} ${units[unitIndex]}`
 }
 
 export default App
