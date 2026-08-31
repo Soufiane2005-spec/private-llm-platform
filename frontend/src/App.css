@@ -127,7 +127,8 @@ h1 {
   font-size: 1.8rem;
 }
 
-.jobs-heading {
+.jobs-heading,
+.benchmark-heading {
   margin-top: 42px;
 }
 
@@ -140,14 +141,16 @@ h1 {
 }
 
 .model-grid,
-.job-grid {
+.job-grid,
+.benchmark-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
 }
 
 .model-card,
-.job-card {
+.job-card,
+.benchmark-card {
   padding: 26px;
   border: 1px solid #292e3c;
   border-radius: 20px;
@@ -157,7 +160,8 @@ h1 {
 }
 
 .model-card-header,
-.job-card-header {
+.job-card-header,
+.benchmark-card-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -167,14 +171,16 @@ h1 {
 }
 
 .model-card h3,
-.job-card h3 {
+.job-card h3,
+.benchmark-card h3 {
   margin: 7px 0 0;
   color: #f8f9fb;
   font-size: 1.35rem;
 }
 
 .model-id,
-.job-id {
+.job-id,
+.benchmark-id {
   margin: 0;
   overflow-wrap: anywhere;
   color: #757d91;
@@ -222,56 +228,76 @@ h1 {
 }
 
 .model-details,
-.job-details {
+.job-details,
+.benchmark-details {
   display: grid;
   gap: 18px;
   margin: 24px 0 0;
 }
 
 .model-details div,
-.job-details div {
+.job-details div,
+.benchmark-details div {
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr);
   gap: 20px;
 }
 
 .model-details dt,
-.job-details dt {
+.job-details dt,
+.benchmark-details dt {
   color: #7f879a;
   font-size: 0.84rem;
 }
 
 .model-details dd,
-.job-details dd {
+.job-details dd,
+.benchmark-details dd {
   margin: 0;
   overflow-wrap: anywhere;
   color: #d9dce4;
 }
 
-.job-summary-grid {
+.job-summary-grid,
+.benchmark-summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
 }
 
-.job-summary-item {
+.job-summary-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.benchmark-summary-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.metric-card {
   padding: 20px;
   border: 1px solid #292e3c;
   border-radius: 16px;
   background: #171a22;
 }
 
-.job-summary-item span {
+.metric-card > span {
   display: block;
   color: #838b9d;
   font-size: 0.8rem;
 }
 
-.job-summary-item strong {
-  display: block;
+.metric-card strong {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
   margin-top: 8px;
   color: #f7f8fb;
   font-size: 1.8rem;
+}
+
+.metric-card small {
+  color: #7f879a;
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 
 .job-status {
@@ -330,6 +356,33 @@ h1 {
   line-height: 1.5;
 }
 
+.benchmark-performance {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.benchmark-performance div {
+  padding: 16px;
+  border: 1px solid #292e3c;
+  border-radius: 13px;
+  background: #13161d;
+}
+
+.benchmark-performance span {
+  display: block;
+  color: #7f879a;
+  font-size: 0.76rem;
+}
+
+.benchmark-performance strong {
+  display: block;
+  margin-top: 6px;
+  color: #f7f8fb;
+  font-size: 1.1rem;
+}
+
 .state-card {
   padding: 30px;
   border: 1px solid #292e3c;
@@ -352,6 +405,12 @@ h1 {
 
 .empty-state strong {
   color: #f7f8fb;
+}
+
+@media (max-width: 1000px) {
+  .benchmark-summary-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 900px) {
@@ -390,24 +449,33 @@ h1 {
   }
 
   .model-grid,
-  .job-grid {
+  .job-grid,
+  .benchmark-grid {
     grid-template-columns: 1fr;
   }
 
+  .benchmark-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .model-details div,
-  .job-details div {
+  .job-details div,
+  .benchmark-details div {
     grid-template-columns: 1fr;
     gap: 6px;
   }
 }
 
 @media (max-width: 480px) {
-  .job-summary-grid {
+  .job-summary-grid,
+  .benchmark-summary-grid,
+  .benchmark-performance {
     grid-template-columns: 1fr;
   }
 
   .model-card-header,
-  .job-card-header {
+  .job-card-header,
+  .benchmark-card-header {
     flex-direction: column;
   }
 }

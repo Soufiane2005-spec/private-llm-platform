@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from infrastructure.config import get_settings
 from interfaces.http.errors import register_exception_handlers
+from interfaces.http.routes.benchmarks import router as benchmarks_router
 from interfaces.http.routes.dashboard import router as dashboard_router
 from interfaces.http.routes.engines import router as engines_router
 from interfaces.http.routes.health import router as health_router
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard_router)
     app.include_router(models_router)
     app.include_router(jobs_router)
+    app.include_router(benchmarks_router)
 
     return app
 
