@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel, Field
 
+from domain.auth.user import UserRole
+
 
 class LoginRequest(BaseModel):
     """Authentication credentials."""
@@ -21,3 +23,12 @@ class CurrentUserResponse(BaseModel):
     """Authenticated user representation."""
 
     username: str
+    role: UserRole
+
+
+class AuthorizationResponse(BaseModel):
+    """Successful authorization response."""
+
+    username: str
+    role: UserRole
+    authorized: bool = True

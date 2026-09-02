@@ -6,6 +6,7 @@ import jwt
 
 from application.ports.token_service import TokenService
 from application.services.auth_exceptions import InvalidAccessTokenError
+from domain.auth.user import UserRole
 
 
 class JWTTokenService(TokenService):
@@ -33,8 +34,12 @@ class JWTTokenService(TokenService):
         self._algorithm = algorithm
         self._expire_minutes = expire_minutes
 
-    def create_access_token(self, subject: str) -> str:
-        """Create a signed JWT access token."""
+    def create_access_token(
+        self,
+        subject: str,
+        role: UserRole,
+    ) -> str:
+        """Create a signed JWT containing identity and role."""
 
         if not subject.strip():
             raise ValueError("subject cannot be empty.")
@@ -43,6 +48,7 @@ class JWTTokenService(TokenService):
 
         payload = {
             "sub": subject,
+            "role": role.value,
             "iat": now,
             "exp": now + timedelta(
                 minutes=self._expire_minutes,
@@ -55,8 +61,11 @@ class JWTTokenService(TokenService):
             algorithm=self._algorithm,
         )
 
-    def get_subject(self, token: str) -> str:
-        """Validate a JWT and return its subject."""
+    def get_identity(
+        self,
+        token: str,
+    ) -> tuple[str, UserRole]:
+        """Validate a JWT and return its subject and role."""
 
         if not token.strip():
             raise InvalidAccessTokenError(
@@ -81,4 +90,18 @@ class JWTTokenService(TokenService):
                 "access token subject is invalid."
             )
 
-        return subject
+        role_value = payload.get("role")
+
+        if not isinstance(role_value, str):
+            raise InvalidAccessTokenError(
+                "access token role is invalid."
+            )
+
+        try:
+            role = UserRole(role_value)
+        except ValueError as exc:
+            raise InvalidAccessTokenError(
+                "access token role is invalid."
+            ) from exc
+
+        return subject, role
