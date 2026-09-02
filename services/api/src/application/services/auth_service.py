@@ -6,7 +6,7 @@ from application.services.auth_exceptions import (
     InvalidAccessTokenError,
     InvalidCredentialsError,
 )
-from domain.auth.user import AuthUser
+from domain.auth.user import AuthUser, UserRole
 
 
 class AuthService:
@@ -17,6 +17,7 @@ class AuthService:
         *,
         username: str,
         password_hash: str,
+        role: UserRole,
         password_hasher: PasswordHasher,
         token_service: TokenService,
     ) -> None:
@@ -28,6 +29,7 @@ class AuthService:
 
         self._username = username
         self._password_hash = password_hash
+        self._role = role
         self._password_hasher = password_hasher
         self._token_service = token_service
 
@@ -49,10 +51,14 @@ class AuthService:
                 "invalid username or password."
             )
 
-        user = AuthUser(username=self._username)
+        user = AuthUser(
+            username=self._username,
+            role=self._role,
+        )
 
         token = self._token_service.create_access_token(
             subject=user.username,
+            role=user.role,
         )
 
         return user, token
@@ -61,7 +67,7 @@ class AuthService:
         """Validate an access token and return its user."""
 
         try:
-            subject = self._token_service.get_subject(token)
+            subject, role = self._token_service.get_identity(token)
         except InvalidAccessTokenError:
             raise
 
@@ -70,4 +76,12 @@ class AuthService:
                 "token subject is not a configured user."
             )
 
-        return AuthUser(username=subject)
+        if role != self._role:
+            raise InvalidAccessTokenError(
+                "token role does not match the configured user."
+            )
+
+        return AuthUser(
+            username=subject,
+            role=role,
+        )

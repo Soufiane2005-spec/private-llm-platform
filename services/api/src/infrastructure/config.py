@@ -6,6 +6,8 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from domain.auth.user import UserRole
+
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
@@ -30,7 +32,9 @@ class Settings(BaseSettings):
     )
     auth_algorithm: str = "HS256"
     auth_access_token_expire_minutes: int = 30
+
     auth_admin_username: str = "admin"
+    auth_admin_role: UserRole = UserRole.ADMIN
 
     auth_admin_password_hash: str = (
         "$argon2id$v=19$m=65536,t=3,p=4$"
