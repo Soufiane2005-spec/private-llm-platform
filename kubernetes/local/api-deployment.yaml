@@ -16,6 +16,14 @@ spec:
         app: api
 
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: api
+
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
