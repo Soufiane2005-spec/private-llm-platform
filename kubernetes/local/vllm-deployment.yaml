@@ -26,6 +26,7 @@ spec:
 
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
@@ -102,6 +103,9 @@ spec:
             - name: model-cache
               mountPath: /root/.cache/huggingface
 
+            - name: tmp
+              mountPath: /tmp
+
       volumes:
         - name: dshm
           emptyDir:
@@ -111,3 +115,6 @@ spec:
         - name: model-cache
           persistentVolumeClaim:
             claimName: vllm-model-cache
+
+        - name: tmp
+          emptyDir: {}
