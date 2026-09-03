@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: llm-platform
+spec:
+  replicas: 1
+
+  selector:
+    matchLabels:
+      app: vllm
+
+  template:
+    metadata:
+      labels:
+        app: vllm
+
+    spec:
+      containers:
+        - name: vllm
+          image: vllm/vllm-openai:v0.27.0
+
+          ports:
+            - containerPort: 8000
+
+          env:
+            - name: HF_TOKEN
+              value: ""
+
+            - name: VLLM_LOGGING_LEVEL
+              value: "INFO"
+
+            - name: VLLM_USE_V2_MODEL_RUNNER
+              value: "0"
+
+          args:
+            - --model
+            - Qwen/Qwen3-0.6B
+            - --served-model-name
+            - qwen3-0.6b
+            - --dtype
+            - half
+            - --gpu-memory-utilization
+            - "0.80"
+            - --max-model-len
+            - "1024"
+            - --max-num-seqs
+            - "1"
+            - --enforce-eager
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          resources:
+            requests:
+              cpu: "1"
+              memory: "2Gi"
+              nvidia.com/gpu: "1"
+
+            limits:
+              cpu: "6"
+              memory: "8Gi"
+              nvidia.com/gpu: "1"
