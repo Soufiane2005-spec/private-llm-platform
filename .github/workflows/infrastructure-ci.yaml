@@ -275,6 +275,49 @@ jobs:
 
           exit "${failed}"
 
+  pdb-validation:
+    name: Validate API PodDisruptionBudget
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        shell: bash
+        run: |
+          sudo wget -q \
+            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 \
+            -O /usr/local/bin/yq
+
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Validate API PDB settings
+        shell: bash
+        run: |
+          manifest="kubernetes/local/api-pod-disruption-budget.yaml"
+
+          min_available=$(yq -r \
+            '.spec.minAvailable // 0' \
+            "${manifest}")
+
+          selector_app=$(yq -r \
+            '.spec.selector.matchLabels.app // ""' \
+            "${manifest}")
+
+          if [[ "${min_available}" != "1" ]]; then
+            echo "API PDB minAvailable must be 1."
+            exit 1
+          fi
+
+          if [[ "${selector_app}" != "api" ]]; then
+            echo "API PDB must select pods with app=api."
+            exit 1
+          fi
+
+          echo "API PodDisruptionBudget configuration is valid."
+
   secret-file-check:
     name: Prevent committed secret files
     runs-on: ubuntu-latest
