@@ -226,7 +226,7 @@ jobs:
             echo "Checking ${manifest}"
 
             seccomp=$(yq -r \
-              '.spec.template.spec.securityContext.seccompProfile.type // ""' \
+              '.spec.template.spec.securityContext.seccompProfile.type' \
               "${manifest}")
 
             if [[ "${seccomp}" != "RuntimeDefault" ]]; then
@@ -244,11 +244,11 @@ jobs:
                 "${manifest}")
 
               allow_privilege=$(yq -r \
-                ".spec.template.spec.containers[$i].securityContext.allowPrivilegeEscalation // true" \
+                ".spec.template.spec.containers[$i].securityContext.allowPrivilegeEscalation" \
                 "${manifest}")
 
               read_only=$(yq -r \
-                ".spec.template.spec.containers[$i].securityContext.readOnlyRootFilesystem // false" \
+                ".spec.template.spec.containers[$i].securityContext.readOnlyRootFilesystem" \
                 "${manifest}")
 
               drops_all=$(yq -r \
