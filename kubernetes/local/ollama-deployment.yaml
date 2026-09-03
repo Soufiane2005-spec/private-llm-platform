@@ -21,9 +21,19 @@ spec:
           - name: ndots
             value: "1"
 
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+
       containers:
         - name: ollama
           image: ollama/ollama:0.32.14
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
 
           ports:
             - containerPort: 11434

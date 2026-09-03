@@ -5,32 +5,49 @@ metadata:
   namespace: llm-platform
 spec:
   replicas: 1
+
   selector:
     matchLabels:
       app: api
+
   template:
     metadata:
       labels:
         app: api
+
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+
       containers:
         - name: api
           image: ghcr.io/soufiane2005-spec/private-llm-api:bab77a8d49a886108826b55743a93a8635e7b0fa
           imagePullPolicy: Always
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+
           ports:
             - containerPort: 8000
+
           readinessProbe:
             httpGet:
               path: /health/ready
               port: 8000
             initialDelaySeconds: 5
             periodSeconds: 10
+
           livenessProbe:
             httpGet:
               path: /health/live
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 20
+
           resources:
             requests:
               cpu: "100m"
