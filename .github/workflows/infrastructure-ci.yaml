@@ -1,6 +1,6 @@
 name: Infrastructure CI
 
-on:
+"on":
   pull_request:
     branches:
       - develop
@@ -9,6 +9,7 @@ on:
       - "kubernetes/**"
       - ".yamllint.yaml"
       - ".github/workflows/infrastructure-ci.yaml"
+
   push:
     branches:
       - develop
@@ -39,6 +40,28 @@ jobs:
 
       - name: Validate Kubernetes YAML
         run: yamllint -c .yamllint.yaml kubernetes
+
+  kubernetes-manifest-validation:
+    name: Validate Kubernetes manifests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Validate local Kubernetes manifests
+        shell: bash
+        run: |
+          for manifest in kubernetes/local/*.yaml; do
+            echo "Validating ${manifest}"
+            kubectl apply \
+              --dry-run=client \
+              --validate=false \
+              -f "${manifest}" >/dev/null
+          done
 
   secret-file-check:
     name: Prevent committed secret files
