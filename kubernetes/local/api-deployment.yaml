@@ -26,7 +26,7 @@ spec:
 
       containers:
         - name: api
-          image: ghcr.io/soufiane2005-spec/private-llm-api:bab77a8d49a886108826b55743a93a8635e7b0fa
+          image: ghcr.io/soufiane2005-spec/private-llm-api:0a9a27da996fdadf3399a92c3ab84c602cab327b
           imagePullPolicy: Always
 
           securityContext:
