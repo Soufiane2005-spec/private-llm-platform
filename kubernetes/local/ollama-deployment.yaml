@@ -52,11 +52,18 @@ spec:
             - name: OLLAMA_NUM_PARALLEL
               value: "1"
 
+          startupProbe:
+            httpGet:
+              path: /api/tags
+              port: 11434
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 60
+
           readinessProbe:
             httpGet:
               path: /api/tags
               port: 11434
-            initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
@@ -65,7 +72,6 @@ spec:
             httpGet:
               path: /api/tags
               port: 11434
-            initialDelaySeconds: 15
             periodSeconds: 20
             timeoutSeconds: 5
             failureThreshold: 3

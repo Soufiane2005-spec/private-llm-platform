@@ -68,7 +68,7 @@ spec:
               port: 8000
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 60
+            failureThreshold: 90
 
           readinessProbe:
             httpGet:
@@ -76,13 +76,13 @@ spec:
               port: 8000
             periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 3
+            failureThreshold: 6
 
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
-            periodSeconds: 20
+            periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
 
