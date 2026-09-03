@@ -318,6 +318,76 @@ jobs:
 
           echo "API PodDisruptionBudget configuration is valid."
 
+  rollout-validation:
+    name: Validate API rollout configuration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        shell: bash
+        run: |
+          sudo wget -q \
+            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 \
+            -O /usr/local/bin/yq
+
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Validate API rollout settings
+        shell: bash
+        run: |
+          manifest="kubernetes/local/api-deployment.yaml"
+
+          strategy=$(yq -r \
+            '.spec.strategy.type // ""' \
+            "${manifest}")
+
+          max_unavailable=$(yq -r \
+            '.spec.strategy.rollingUpdate.maxUnavailable // ""' \
+            "${manifest}")
+
+          max_surge=$(yq -r \
+            '.spec.strategy.rollingUpdate.maxSurge // ""' \
+            "${manifest}")
+
+          min_ready=$(yq -r \
+            '.spec.minReadySeconds // 0' \
+            "${manifest}")
+
+          progress_deadline=$(yq -r \
+            '.spec.progressDeadlineSeconds // 0' \
+            "${manifest}")
+
+          if [[ "${strategy}" != "RollingUpdate" ]]; then
+            echo "API strategy must be RollingUpdate."
+            exit 1
+          fi
+
+          if [[ "${max_unavailable}" != "0" ]]; then
+            echo "API maxUnavailable must be 0."
+            exit 1
+          fi
+
+          if [[ "${max_surge}" != "1" ]]; then
+            echo "API maxSurge must be 1."
+            exit 1
+          fi
+
+          if [[ "${min_ready}" != "10" ]]; then
+            echo "API minReadySeconds must be 10."
+            exit 1
+          fi
+
+          if [[ "${progress_deadline}" != "120" ]]; then
+            echo "API progressDeadlineSeconds must be 120."
+            exit 1
+          fi
+
+          echo "API rollout configuration is valid."
+
   secret-file-check:
     name: Prevent committed secret files
     runs-on: ubuntu-latest
