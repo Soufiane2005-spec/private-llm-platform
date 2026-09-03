@@ -49,19 +49,27 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
+      - name: Install kubeconform
+        shell: bash
+        run: |
+          curl -L \
+            https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz \
+            -o /tmp/kubeconform.tar.gz
+
+          tar -xzf /tmp/kubeconform.tar.gz -C /tmp
+          sudo mv /tmp/kubeconform /usr/local/bin/kubeconform
+          sudo chmod +x /usr/local/bin/kubeconform
+
+          kubeconform -v
 
       - name: Validate local Kubernetes manifests
         shell: bash
         run: |
-          for manifest in kubernetes/local/*.yaml; do
-            echo "Validating ${manifest}"
-            kubectl apply \
-              --dry-run=client \
-              --validate=false \
-              -f "${manifest}" >/dev/null
-          done
+          kubeconform \
+            -strict \
+            -summary \
+            -ignore-missing-schemas \
+            kubernetes/local
 
   resource-requirements-check:
     name: Validate workload resource requirements
@@ -77,6 +85,7 @@ jobs:
           sudo wget -q \
             https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 \
             -O /usr/local/bin/yq
+
           sudo chmod +x /usr/local/bin/yq
           yq --version
 
@@ -88,7 +97,9 @@ jobs:
           for manifest in kubernetes/local/*-deployment.yaml; do
             echo "Checking ${manifest}"
 
-            container_count=$(yq '.spec.template.spec.containers | length' "${manifest}")
+            container_count=$(yq \
+              '.spec.template.spec.containers | length' \
+              "${manifest}")
 
             for ((i=0; i<container_count; i++)); do
               name=$(yq -r \
