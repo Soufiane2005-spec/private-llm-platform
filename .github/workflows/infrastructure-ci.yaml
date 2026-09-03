@@ -134,6 +134,67 @@ jobs:
 
           exit "${failed}"
 
+  hpa-validation:
+    name: Validate API HPA configuration
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        shell: bash
+        run: |
+          sudo wget -q \
+            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 \
+            -O /usr/local/bin/yq
+
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Validate API HPA settings
+        shell: bash
+        run: |
+          manifest="kubernetes/local/api-hpa.yaml"
+
+          min_replicas=$(yq -r '.spec.minReplicas // 0' "${manifest}")
+          max_replicas=$(yq -r '.spec.maxReplicas // 0' "${manifest}")
+
+          cpu_target=$(yq -r \
+            '.spec.metrics[] |
+             select(.type == "Resource" and .resource.name == "cpu") |
+             .resource.target.averageUtilization // 0' \
+            "${manifest}")
+
+          target_name=$(yq -r \
+            '.spec.scaleTargetRef.name // ""' \
+            "${manifest}")
+
+          if [[ "${target_name}" != "api" ]]; then
+            echo "HPA must target the api Deployment."
+            exit 1
+          fi
+
+          if (( min_replicas < 1 )); then
+            echo "HPA minReplicas must be at least 1."
+            exit 1
+          fi
+
+          if (( max_replicas < min_replicas )); then
+            echo "HPA maxReplicas must be greater than or equal to minReplicas."
+            exit 1
+          fi
+
+          if (( cpu_target < 1 || cpu_target > 100 )); then
+            echo "HPA CPU utilization target must be between 1 and 100."
+            exit 1
+          fi
+
+          echo "HPA configuration is valid."
+          echo "minReplicas=${min_replicas}"
+          echo "maxReplicas=${max_replicas}"
+          echo "cpuTarget=${cpu_target}%"
+
   secret-file-check:
     name: Prevent committed secret files
     runs-on: ubuntu-latest
