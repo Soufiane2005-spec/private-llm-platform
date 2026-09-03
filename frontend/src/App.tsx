@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import './App.css'
-
+import { ChatView } from './components/ChatView'
 import {
   fetchBenchmarkReport,
   fetchBenchmarks,
@@ -16,7 +16,12 @@ import type { Job, JobStatus } from './types/job'
 import type { ModelCatalogEntry } from './types/model'
 import type { MonitoringDashboard } from './types/monitoring'
 
-type View = 'models' | 'jobs' | 'benchmarks' | 'monitoring'
+type View =
+  | 'models'
+  | 'jobs'
+  | 'benchmarks'
+  | 'monitoring'
+  | 'chat'
 
 function App() {
   const [view, setView] = useState<View>('models')
@@ -170,6 +175,12 @@ function App() {
           >
             Monitoring
           </NavigationButton>
+          <NavigationButton
+               active={view === 'chat'}
+                 onClick={() => setView('chat')}
+                   >
+                  Chat
+</NavigationButton>
         </nav>
       </header>
 
@@ -207,6 +218,7 @@ function App() {
           error={monitoringError}
         />
       )}
+      {view === 'chat' && <ChatView />}
     </main>
   )
 }
