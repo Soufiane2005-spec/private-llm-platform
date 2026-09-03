@@ -63,6 +63,66 @@ jobs:
               -f "${manifest}" >/dev/null
           done
 
+  resource-requirements-check:
+    name: Validate workload resource requirements
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        shell: bash
+        run: |
+          sudo wget -q \
+            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 \
+            -O /usr/local/bin/yq
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Check Deployment resource requests and limits
+        shell: bash
+        run: |
+          failed=0
+
+          for manifest in kubernetes/local/*-deployment.yaml; do
+            echo "Checking ${manifest}"
+
+            container_count=$(yq '.spec.template.spec.containers | length' "${manifest}")
+
+            for ((i=0; i<container_count; i++)); do
+              name=$(yq -r \
+                ".spec.template.spec.containers[$i].name" \
+                "${manifest}")
+
+              cpu_request=$(yq -r \
+                ".spec.template.spec.containers[$i].resources.requests.cpu // \"\"" \
+                "${manifest}")
+
+              memory_request=$(yq -r \
+                ".spec.template.spec.containers[$i].resources.requests.memory // \"\"" \
+                "${manifest}")
+
+              cpu_limit=$(yq -r \
+                ".spec.template.spec.containers[$i].resources.limits.cpu // \"\"" \
+                "${manifest}")
+
+              memory_limit=$(yq -r \
+                ".spec.template.spec.containers[$i].resources.limits.memory // \"\"" \
+                "${manifest}")
+
+              if [[ -z "${cpu_request}" || \
+                    -z "${memory_request}" || \
+                    -z "${cpu_limit}" || \
+                    -z "${memory_limit}" ]]; then
+                echo "Missing CPU/memory resources for ${name} in ${manifest}"
+                failed=1
+              fi
+            done
+          done
+
+          exit "${failed}"
+
   secret-file-check:
     name: Prevent committed secret files
     runs-on: ubuntu-latest
