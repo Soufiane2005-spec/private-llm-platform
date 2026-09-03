@@ -4,7 +4,7 @@ metadata:
   name: api
   namespace: llm-platform
 spec:
-  replicas: 1
+  replicas: 2
 
   selector:
     matchLabels:
