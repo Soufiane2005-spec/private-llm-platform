@@ -16,9 +16,19 @@ spec:
         app: vllm
 
     spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+
       containers:
         - name: vllm
           image: vllm/vllm-openai:v0.27.0
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
 
           ports:
             - containerPort: 8000
@@ -77,8 +87,17 @@ spec:
               cpu: "1"
               memory: "2Gi"
               nvidia.com/gpu: "1"
-
             limits:
               cpu: "6"
               memory: "8Gi"
               nvidia.com/gpu: "1"
+
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 2Gi
