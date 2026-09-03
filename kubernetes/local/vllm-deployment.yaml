@@ -43,6 +43,9 @@ spec:
             - name: VLLM_USE_V2_MODEL_RUNNER
               value: "0"
 
+            - name: HF_HOME
+              value: /root/.cache/huggingface
+
           args:
             - --model
             - Qwen/Qwen3-0.6B
@@ -96,8 +99,15 @@ spec:
             - name: dshm
               mountPath: /dev/shm
 
+            - name: model-cache
+              mountPath: /root/.cache/huggingface
+
       volumes:
         - name: dshm
           emptyDir:
             medium: Memory
             sizeLimit: 2Gi
+
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: vllm-model-cache
