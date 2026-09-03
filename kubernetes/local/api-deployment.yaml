@@ -25,6 +25,8 @@ spec:
         app: api
 
     spec:
+      terminationGracePeriodSeconds: 30
+
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
@@ -55,6 +57,14 @@ spec:
 
           ports:
             - containerPort: 8000
+
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - sleep 10
 
           startupProbe:
             httpGet:
