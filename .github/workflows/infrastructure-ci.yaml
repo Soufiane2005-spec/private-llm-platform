@@ -195,6 +195,86 @@ jobs:
           echo "maxReplicas=${max_replicas}"
           echo "cpuTarget=${cpu_target}%"
 
+  security-context-validation:
+    name: Validate workload security contexts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install yq
+        shell: bash
+        run: |
+          sudo wget -q \
+            https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64 \
+            -O /usr/local/bin/yq
+
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Validate Deployment security settings
+        shell: bash
+        run: |
+          failed=0
+
+          for manifest in \
+            kubernetes/local/api-deployment.yaml \
+            kubernetes/local/ollama-deployment.yaml \
+            kubernetes/local/vllm-deployment.yaml; do
+
+            echo "Checking ${manifest}"
+
+            seccomp=$(yq -r \
+              '.spec.template.spec.securityContext.seccompProfile.type // ""' \
+              "${manifest}")
+
+            if [[ "${seccomp}" != "RuntimeDefault" ]]; then
+              echo "Missing RuntimeDefault seccomp profile in ${manifest}"
+              failed=1
+            fi
+
+            container_count=$(yq \
+              '.spec.template.spec.containers | length' \
+              "${manifest}")
+
+            for ((i=0; i<container_count; i++)); do
+              name=$(yq -r \
+                ".spec.template.spec.containers[$i].name" \
+                "${manifest}")
+
+              allow_privilege=$(yq -r \
+                ".spec.template.spec.containers[$i].securityContext.allowPrivilegeEscalation // true" \
+                "${manifest}")
+
+              read_only=$(yq -r \
+                ".spec.template.spec.containers[$i].securityContext.readOnlyRootFilesystem // false" \
+                "${manifest}")
+
+              drops_all=$(yq -r \
+                ".spec.template.spec.containers[$i].securityContext.capabilities.drop[]? |
+                 select(. == \"ALL\")" \
+                "${manifest}")
+
+              if [[ "${allow_privilege}" != "false" ]]; then
+                echo "allowPrivilegeEscalation must be false for ${name}"
+                failed=1
+              fi
+
+              if [[ "${read_only}" != "true" ]]; then
+                echo "readOnlyRootFilesystem must be true for ${name}"
+                failed=1
+              fi
+
+              if [[ "${drops_all}" != "ALL" ]]; then
+                echo "Container ${name} must drop ALL capabilities"
+                failed=1
+              fi
+            done
+          done
+
+          exit "${failed}"
+
   secret-file-check:
     name: Prevent committed secret files
     runs-on: ubuntu-latest
