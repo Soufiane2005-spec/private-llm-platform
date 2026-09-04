@@ -21,9 +21,14 @@ class JobService:
     def submit(self, job_type: str) -> Job:
         """Create, persist, and enqueue a pending job."""
 
+        clean_job_type = job_type.strip()
+
+        if not clean_job_type:
+            raise ValueError("job_type cannot be empty.")
+
         job = Job(
             job_id=str(uuid4()),
-            job_type=job_type,
+            job_type=clean_job_type,
         )
 
         self._repository.save(job)
@@ -35,6 +40,8 @@ class JobService:
         """Return a job by identifier."""
 
         return self._repository.get(job_id)
+
     def list_jobs(self) -> tuple[Job, ...]:
         """Return all tracked jobs."""
+
         return self._repository.list()

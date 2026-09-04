@@ -10,7 +10,7 @@ from infrastructure.persistence.in_memory_job_repository import (
     InMemoryJobRepository,
 )
 from infrastructure.queue.in_memory_job_queue import InMemoryJobQueue
-from interfaces.http.schemas.jobs import JobResponse
+from interfaces.http.schemas.jobs import JobCreateRequest, JobResponse
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -51,6 +51,28 @@ def list_jobs(
     """Return all jobs tracked by the platform."""
 
     return [_to_response(job) for job in service.list_jobs()]
+
+
+@router.post(
+    "",
+    response_model=JobResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def submit_job(
+    request: JobCreateRequest,
+    service: JobServiceDependency,
+) -> JobResponse:
+    """Submit a new asynchronous platform job."""
+
+    try:
+        job = service.submit(request.job_type)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    return _to_response(job)
 
 
 @router.get("/{job_id}", response_model=JobResponse)

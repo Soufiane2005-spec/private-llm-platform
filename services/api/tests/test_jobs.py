@@ -85,6 +85,47 @@ def test_list_jobs_returns_tracked_jobs() -> None:
     ]
 
 
+def test_submit_job_creates_pending_job() -> None:
+    """Submit a new asynchronous job through the HTTP API."""
+
+    repository = InMemoryJobRepository()
+    client = create_test_client(repository)
+
+    response = client.post(
+        "/jobs",
+        json={"job_type": " benchmark "},
+    )
+
+    assert response.status_code == 201
+
+    body = response.json()
+
+    assert body["job_id"]
+    assert body["job_type"] == "benchmark"
+    assert body["status"] == "pending"
+    assert body["error"] is None
+    assert body["attempts"] == 0
+    assert body["max_attempts"] == 3
+    assert repository.get(body["job_id"]) is not None
+
+
+def test_submit_job_rejects_blank_type() -> None:
+    """Reject a blank asynchronous job type."""
+
+    repository = InMemoryJobRepository()
+    client = create_test_client(repository)
+
+    response = client.post(
+        "/jobs",
+        json={"job_type": "   "},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": "job_type cannot be empty.",
+    }
+
+
 def test_get_job_returns_job() -> None:
     """Return a tracked job by identifier."""
 

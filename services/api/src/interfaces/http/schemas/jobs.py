@@ -1,8 +1,17 @@
 """HTTP schemas for asynchronous job endpoints."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from domain.jobs.job import JobStatus
+
+
+class JobCreateRequest(BaseModel):
+    """Request payload used to submit an asynchronous job."""
+
+    job_type: str = Field(
+        min_length=1,
+        max_length=100,
+    )
 
 
 class JobResponse(BaseModel):
