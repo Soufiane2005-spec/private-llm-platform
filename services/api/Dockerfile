@@ -7,6 +7,7 @@ RUN addgroup --system appgroup \
 
 COPY pyproject.toml .
 COPY src ./src
+COPY data ./data
 
 RUN pip install --no-cache-dir . \
     && chown -R appuser:appgroup /app
