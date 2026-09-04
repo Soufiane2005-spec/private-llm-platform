@@ -1,12 +1,19 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import './App.css'
 
+import { fetchCurrentUser, login } from './api/auth'
 import { fetchBenchmarkReport, fetchBenchmarks } from './api/benchmarks'
+import {
+  deployModel,
+  fetchDeployments,
+  runDeploymentAction,
+} from './api/deployments'
 import { fetchJobs } from './api/job'
 import { fetchModels } from './api/models'
 import { fetchMonitoringDashboard } from './api/monitoring'
 import { ChatView } from './components/ChatView'
+import type { CurrentUser } from './types/auth'
 import type {
   BenchmarkRecord,
   BenchmarkReport,
@@ -14,6 +21,7 @@ import type {
 import type { Job, JobStatus } from './types/job'
 import type { ModelCatalogEntry } from './types/model'
 import type { MonitoringDashboard } from './types/monitoring'
+import type { ModelDeployment } from './types/deployment'
 
 type View = 'models' | 'jobs' | 'benchmarks' | 'monitoring' | 'chat'
 
@@ -40,10 +48,19 @@ interface EngineBenchmarkAverage {
 
 function App() {
   const [view, setView] = useState<View>('models')
+  const [token, setToken] = useState<string | null>(
+    () => localStorage.getItem('platform-token'),
+  )
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  const [loginError, setLoginError] = useState<string | null>(null)
 
   const [models, setModels] = useState<ModelCatalogEntry[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
   const [modelsError, setModelsError] = useState<string | null>(null)
+  const [deployments, setDeployments] = useState<ModelDeployment[]>([])
+  const [deploymentsLoading, setDeploymentsLoading] = useState(false)
+  const [deploymentsError, setDeploymentsError] = useState<string | null>(null)
+  const [deploymentAction, setDeploymentAction] = useState<string | null>(null)
 
   const [jobs, setJobs] = useState<Job[]>([])
   const [jobsLoading, setJobsLoading] = useState(true)
@@ -76,6 +93,134 @@ function App() {
 
     void loadModels()
   }, [])
+
+  useEffect(() => {
+    if (!token) {
+      return
+    }
+
+    const activeToken = token
+
+    async function loadUser() {
+      try {
+        const user = await fetchCurrentUser(activeToken)
+        setCurrentUser(user)
+      } catch {
+        localStorage.removeItem('platform-token')
+        setToken(null)
+      }
+    }
+
+    void loadUser()
+  }, [token])
+
+  const loadDeployments = useCallback(async (activeToken = token) => {
+    if (!activeToken) {
+      return
+    }
+
+    setDeploymentsLoading(true)
+    setDeploymentsError(null)
+
+    try {
+      const data = await fetchDeployments(activeToken)
+      setDeployments(data)
+    } catch (err) {
+      setDeploymentsError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to load deployments.',
+      )
+    } finally {
+      setDeploymentsLoading(false)
+    }
+  }, [token])
+
+  useEffect(() => {
+    if (!token) {
+      return
+    }
+
+    const activeToken = token
+
+    async function refreshDeployments() {
+      await loadDeployments(activeToken)
+    }
+
+    void refreshDeployments()
+    const interval = window.setInterval(() => {
+      void refreshDeployments()
+    }, 5000)
+
+    return () => window.clearInterval(interval)
+  }, [loadDeployments, token])
+
+  async function handleLogin(username: string, password: string) {
+    setLoginError(null)
+
+    try {
+      const result = await login(username, password)
+      localStorage.setItem('platform-token', result.access_token)
+      setToken(result.access_token)
+    } catch (err) {
+      setLoginError(err instanceof Error ? err.message : 'Login failed.')
+    }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem('platform-token')
+    setToken(null)
+    setCurrentUser(null)
+  }
+
+  async function handleDeploy(model: ModelCatalogEntry) {
+    if (!token) {
+      setDeploymentsError('Login required.')
+      return
+    }
+
+    setDeploymentAction(`deploy-${model.model_id}`)
+    setDeploymentsError(null)
+
+    try {
+      await deployModel(token, model.engine_model_id, model.engine)
+      await loadDeployments(token)
+      const data = await fetchJobs()
+      setJobs(data)
+    } catch (err) {
+      setDeploymentsError(
+        err instanceof Error ? err.message : 'Deploy failed.',
+      )
+    } finally {
+      setDeploymentAction(null)
+    }
+  }
+
+  async function handleDeploymentAction(
+    deploymentId: string,
+    action: 'start' | 'stop' | 'restart',
+  ) {
+    if (!token) {
+      setDeploymentsError('Login required.')
+      return
+    }
+
+    setDeploymentAction(`${action}-${deploymentId}`)
+    setDeploymentsError(null)
+
+    try {
+      await runDeploymentAction(token, deploymentId, action)
+      await loadDeployments(token)
+      const data = await fetchJobs()
+      setJobs(data)
+    } catch (err) {
+      setDeploymentsError(
+        err instanceof Error ? err.message : `${action} failed.`,
+      )
+    } finally {
+      setDeploymentAction(null)
+    }
+  }
 
   useEffect(() => {
     async function loadJobs() {
@@ -198,6 +343,13 @@ function App() {
             Chat
           </NavigationButton>
         </nav>
+
+        <AuthPanel
+          user={currentUser}
+          error={loginError}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+        />
       </header>
 
       {view === 'models' && (
@@ -206,6 +358,13 @@ function App() {
           loading={modelsLoading}
           error={modelsError}
           enabledModels={enabledModels}
+          deployments={deployments}
+          deploymentsLoading={deploymentsLoading}
+          deploymentsError={deploymentsError}
+          user={currentUser}
+          action={deploymentAction}
+          onDeploy={handleDeploy}
+          onDeploymentAction={handleDeploymentAction}
         />
       )}
 
@@ -267,6 +426,16 @@ interface ModelsViewProps {
   loading: boolean
   error: string | null
   enabledModels: number
+  deployments: ModelDeployment[]
+  deploymentsLoading: boolean
+  deploymentsError: string | null
+  user: CurrentUser | null
+  action: string | null
+  onDeploy: (model: ModelCatalogEntry) => void
+  onDeploymentAction: (
+    deploymentId: string,
+    action: 'start' | 'stop' | 'restart',
+  ) => void
 }
 
 function ModelsView({
@@ -274,7 +443,16 @@ function ModelsView({
   loading,
   error,
   enabledModels,
+  deployments,
+  deploymentsLoading,
+  deploymentsError,
+  user,
+  action,
+  onDeploy,
+  onDeploymentAction,
 }: ModelsViewProps) {
+  const canOperate = user?.role === 'admin' || user?.role === 'engineer'
+
   return (
     <>
       <section className="hero">
@@ -355,12 +533,220 @@ function ModelsView({
                     </dd>
                   </div>
                 </dl>
+
+                {canOperate && (
+                  <button
+                    type="button"
+                    className="action-button"
+                    disabled={action === `deploy-${model.model_id}`}
+                    onClick={() => onDeploy(model)}
+                  >
+                    {action === `deploy-${model.model_id}`
+                      ? 'Deploying'
+                      : 'Deploy'}
+                  </button>
+                )}
               </article>
             ))}
           </div>
         )}
       </section>
+
+      <section className="content">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Runtime</p>
+            <h2>Deployments</h2>
+          </div>
+
+          <span className="status">
+            {user ? `${deployments.length} tracked` : 'Login required'}
+          </span>
+        </div>
+
+        {!user && (
+          <EmptyState
+            title="Authentication required"
+            message="Login to view and operate model deployments."
+          />
+        )}
+
+        {user && deploymentsLoading && (
+          <LoadingState message="Loading deployments..." />
+        )}
+
+        {user && deploymentsError && (
+          <ErrorState
+            title="Unable to load deployments"
+            message={deploymentsError}
+          />
+        )}
+
+        {user &&
+          !deploymentsLoading &&
+          !deploymentsError &&
+          deployments.length === 0 && (
+            <EmptyState
+              title="No deployments yet"
+              message="Deploy an Ollama or vLLM catalog model to create a runtime entry."
+            />
+          )}
+
+        {user &&
+          !deploymentsLoading &&
+          !deploymentsError &&
+          deployments.length > 0 && (
+            <div className="model-grid">
+              {deployments.map((deployment) => (
+                <DeploymentCard
+                  key={deployment.deployment_id}
+                  deployment={deployment}
+                  canOperate={canOperate}
+                  action={action}
+                  onAction={onDeploymentAction}
+                />
+              ))}
+            </div>
+          )}
+      </section>
     </>
+  )
+}
+
+function DeploymentCard({
+  deployment,
+  canOperate,
+  action,
+  onAction,
+}: {
+  deployment: ModelDeployment
+  canOperate: boolean
+  action: string | null
+  onAction: (
+    deploymentId: string,
+    action: 'start' | 'stop' | 'restart',
+  ) => void
+}) {
+  return (
+    <article className="model-card">
+      <div className="model-card-header">
+        <div>
+          <p className="model-id">{deployment.deployment_id}</p>
+          <h3>{deployment.model}</h3>
+        </div>
+
+        <span className={`runtime-status runtime-${deployment.status}`}>
+          <span className="runtime-status-dot" />
+          {formatRuntimeStatus(deployment.status)}
+        </span>
+      </div>
+
+      <dl className="model-details">
+        <div>
+          <dt>Engine</dt>
+          <dd>
+            <span
+              className={`engine-badge engine-${deployment.engine.toLowerCase()}`}
+            >
+              {deployment.engine}
+            </span>
+          </dd>
+        </div>
+
+        <div>
+          <dt>Runtime</dt>
+          <dd>{deployment.runtime_state}</dd>
+        </div>
+
+        <div>
+          <dt>GPU</dt>
+          <dd>
+            {deployment.gpu_available === null
+              ? 'Unknown'
+              : deployment.gpu_available
+                ? 'Available'
+                : 'Unavailable'}
+          </dd>
+        </div>
+      </dl>
+
+      {deployment.error && (
+        <div className="job-error">
+          <span>Error</span>
+          <p>{deployment.error}</p>
+        </div>
+      )}
+
+      {canOperate && (
+        <div className="action-row">
+          {(['start', 'stop', 'restart'] as const).map((operation) => (
+            <button
+              key={operation}
+              type="button"
+              className="action-button action-button-secondary"
+              disabled={action === `${operation}-${deployment.deployment_id}`}
+              onClick={() => onAction(deployment.deployment_id, operation)}
+            >
+              {action === `${operation}-${deployment.deployment_id}`
+                ? 'Running'
+                : formatRuntimeStatus(operation)}
+            </button>
+          ))}
+        </div>
+      )}
+    </article>
+  )
+}
+
+function AuthPanel({
+  user,
+  error,
+  onLogin,
+  onLogout,
+}: {
+  user: CurrentUser | null
+  error: string | null
+  onLogin: (username: string, password: string) => void
+  onLogout: () => void
+}) {
+  const [username, setUsername] = useState('admin')
+  const [password, setPassword] = useState('')
+
+  if (user) {
+    return (
+      <div className="auth-panel auth-panel-user">
+        <span>
+          {user.username} · {user.role}
+        </span>
+        <button type="button" onClick={onLogout}>
+          Logout
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <form
+      className="auth-panel"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onLogin(username, password)
+      }}
+    >
+      <input
+        aria-label="Username"
+        value={username}
+        onChange={(event) => setUsername(event.target.value)}
+      />
+      <input
+        aria-label="Password"
+        type="password"
+        value={password}
+        onChange={(event) => setPassword(event.target.value)}
+      />
+      <button type="submit">Login</button>
+      {error && <span className="auth-error">{error}</span>}
+    </form>
   )
 }
 

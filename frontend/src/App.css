@@ -16,6 +16,70 @@
   padding: 0 0 28px;
 }
 
+.auth-panel {
+  display: inline-flex;
+  position: relative;
+  align-items: center;
+  gap: 8px;
+}
+
+.auth-panel input {
+  width: 110px;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid #2f3545;
+  border-radius: 8px;
+  background: #151820;
+  color: #e5e8ee;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.auth-panel button,
+.action-button {
+  border: 1px solid #3a4154;
+  border-radius: 8px;
+  background: #e5e8ee;
+  color: #11141b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.auth-panel button {
+  padding: 8px 11px;
+}
+
+.auth-panel button:disabled,
+.action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.auth-panel-user {
+  padding: 4px;
+  border: 1px solid #282d3a;
+  border-radius: 10px;
+  background: #151820;
+}
+
+.auth-panel-user span {
+  padding: 0 8px;
+  color: #aab1c2;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.auth-error {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  color: #ffb7bd;
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
 .platform-name {
   margin: 0;
   color: #d8dce5;
@@ -258,6 +322,27 @@ h1 {
   color: #d9dce4;
 }
 
+.action-button {
+  margin-top: 22px;
+  padding: 10px 14px;
+}
+
+.action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.action-row .action-button {
+  margin-top: 0;
+}
+
+.action-button-secondary {
+  background: #252a36;
+  color: #e5e8ee;
+}
+
 .job-summary-grid,
 .benchmark-summary-grid {
   display: grid;
@@ -434,6 +519,15 @@ h1 {
     flex-direction: column;
   }
 
+  .auth-panel {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .auth-panel input {
+    width: min(180px, 100%);
+  }
+
   .navigation {
     width: 100%;
   }
@@ -598,7 +692,28 @@ h1 {
   color: #77e0b5;
 }
 
+.runtime-running {
+  background: #17372c;
+  color: #77e0b5;
+}
+
+.runtime-stopped {
+  background: #302c20;
+  color: #e4c768;
+}
+
+.runtime-deploying,
+.runtime-loading {
+  background: #1d2e44;
+  color: #7ab8ff;
+}
+
 .runtime-unavailable {
+  background: #3a2427;
+  color: #f39a9a;
+}
+
+.runtime-failed {
   background: #3a2427;
   color: #f39a9a;
 }
