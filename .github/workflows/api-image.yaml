@@ -1,6 +1,6 @@
 name: API Container Image
 
-on:
+"on":
   push:
     branches:
       - develop

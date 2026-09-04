@@ -24,3 +24,7 @@ After Metrics Server is installed, verify that the metrics API is available:
 
 ```bash
 kubectl get apiservice v1beta1.metrics.k8s.io
+kubectl top nodes
+kubectl top pods -n llm-platform
+kubectl get hpa -n llm-platform
+```
