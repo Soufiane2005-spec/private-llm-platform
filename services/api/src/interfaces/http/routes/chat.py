@@ -3,6 +3,7 @@
 from fastapi import APIRouter, HTTPException, status
 
 from application.services.rag_chat_service import RagChatService
+from infrastructure.config import get_settings
 from infrastructure.llm.ollama_chat_model import (
     OllamaChatError,
     OllamaChatModel,
@@ -20,10 +21,20 @@ router = APIRouter(
     tags=["chat"],
 )
 
-_chat_service = RagChatService(
-    chat_model=OllamaChatModel(),
-    knowledge_retriever=LocalKnowledgeRetriever(),
-)
+
+def _build_chat_service() -> RagChatService:
+    settings = get_settings()
+
+    return RagChatService(
+        chat_model=OllamaChatModel(
+            base_url=settings.ollama_base_url,
+            timeout_seconds=settings.ollama_timeout_seconds,
+        ),
+        knowledge_retriever=LocalKnowledgeRetriever(),
+    )
+
+
+_chat_service = _build_chat_service()
 
 
 @router.post(

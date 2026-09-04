@@ -80,6 +80,43 @@ def test_generate_reply_returns_ollama_response(
     assert reply == "Bonjour depuis Ollama."
 
 
+def test_generate_reply_uses_custom_base_url_and_timeout(
+    monkeypatch,
+) -> None:
+    """Use the configured Ollama endpoint when one is provided."""
+
+    def fake_post(
+        url: str,
+        *,
+        json: dict,
+        timeout: float,
+    ) -> FakeResponse:
+        assert url == "http://ollama:11434/api/chat"
+        assert timeout == 30.0
+
+        return FakeResponse(
+            payload={
+                "message": {
+                    "content": "Réponse Kubernetes.",
+                }
+            }
+        )
+
+    monkeypatch.setattr(httpx, "post", fake_post)
+
+    model = OllamaChatModel(
+        base_url="http://ollama:11434/",
+        timeout_seconds=30.0,
+    )
+
+    reply = model.generate_reply(
+        model="qwen2.5:1.5b",
+        message="Bonjour",
+    )
+
+    assert reply == "Réponse Kubernetes."
+
+
 def test_generate_reply_maps_http_errors(
     monkeypatch,
 ) -> None:

@@ -42,6 +42,9 @@ class Settings(BaseSettings):
         "TlHBjjWGUeKzB6Sla1jU8HmJTUYbQ82gRjdB0iBkRwM"
     )
 
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    ollama_timeout_seconds: float = 120.0
+
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
         env_file_encoding="utf-8",
