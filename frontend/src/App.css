@@ -343,6 +343,68 @@ h1 {
   color: #e5e8ee;
 }
 
+.action-button-danger {
+  border-color: #593237;
+  background: #3a2427;
+  color: #ffb7bd;
+}
+
+.user-create-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.user-create-form input,
+.user-create-form select,
+.user-controls select {
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #2f3545;
+  border-radius: 8px;
+  background: #151820;
+  color: #e5e8ee;
+  font: inherit;
+  font-size: 0.84rem;
+}
+
+.user-create-form .action-button {
+  margin-top: 0;
+}
+
+.user-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.user-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid #292e3c;
+  border-radius: 16px;
+  background: #171a22;
+}
+
+.user-card h3 {
+  margin: 5px 0 0;
+  color: #f8f9fb;
+}
+
+.user-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user-controls .action-button {
+  margin-top: 0;
+}
+
 .job-summary-grid,
 .benchmark-summary-grid {
   display: grid;
@@ -554,6 +616,15 @@ h1 {
 
   .benchmark-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .user-create-form,
+  .user-card {
+    grid-template-columns: 1fr;
+  }
+
+  .user-controls {
+    flex-wrap: wrap;
   }
 
   .model-details div,

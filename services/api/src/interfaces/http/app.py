@@ -14,6 +14,7 @@ from interfaces.http.routes.engines import router as engines_router
 from interfaces.http.routes.health import router as health_router
 from interfaces.http.routes.jobs import router as jobs_router
 from interfaces.http.routes.models import router as models_router
+from interfaces.http.routes.users import router as users_router
 
 
 def create_app() -> FastAPI:
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(auth_router)
+    app.include_router(users_router)
     app.include_router(engines_router)
     app.include_router(dashboard_router)
     app.include_router(models_router)

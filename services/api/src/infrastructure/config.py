@@ -53,6 +53,7 @@ class Settings(BaseSettings):
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_timeout_seconds: float = 120.0
     cors_allowed_origins: str = ",".join(DEFAULT_CORS_ALLOWED_ORIGINS)
+    database_url: str = "sqlite:///./data/platform.db"
 
     @property
     def allowed_cors_origins(self) -> tuple[str, ...]:
@@ -63,6 +64,22 @@ class Settings(BaseSettings):
             for origin in self.cors_allowed_origins.split(",")
             if origin.strip()
         )
+
+    @property
+    def sqlite_database_path(self) -> Path:
+        """Return the SQLite path configured for local persistence."""
+
+        prefix = "sqlite:///"
+
+        if not self.database_url.startswith(prefix):
+            raise ValueError("Only sqlite:/// DATABASE_URL values are supported.")
+
+        configured_path = Path(self.database_url.removeprefix(prefix))
+
+        if configured_path.is_absolute():
+            return configured_path
+
+        return ENV_FILE.parent / configured_path
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,

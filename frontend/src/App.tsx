@@ -12,8 +12,14 @@ import {
 import { fetchJobs } from './api/job'
 import { fetchModels } from './api/models'
 import { fetchMonitoringDashboard } from './api/monitoring'
+import {
+  createUser,
+  deleteUser,
+  fetchUsers,
+  updateUser,
+} from './api/users'
 import { ChatView } from './components/ChatView'
-import type { CurrentUser } from './types/auth'
+import type { CurrentUser, UserRole } from './types/auth'
 import type {
   BenchmarkRecord,
   BenchmarkReport,
@@ -22,8 +28,9 @@ import type { Job, JobStatus } from './types/job'
 import type { ModelCatalogEntry } from './types/model'
 import type { MonitoringDashboard } from './types/monitoring'
 import type { ModelDeployment } from './types/deployment'
+import type { PlatformUser } from './types/user'
 
-type View = 'models' | 'jobs' | 'benchmarks' | 'monitoring' | 'chat'
+type View = 'models' | 'jobs' | 'benchmarks' | 'monitoring' | 'chat' | 'users'
 
 interface ChartDatum {
   label: string
@@ -53,6 +60,10 @@ function App() {
   )
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
   const [loginError, setLoginError] = useState<string | null>(null)
+  const [users, setUsers] = useState<PlatformUser[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [usersError, setUsersError] = useState<string | null>(null)
+  const [userAction, setUserAction] = useState<string | null>(null)
 
   const [models, setModels] = useState<ModelCatalogEntry[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
@@ -114,6 +125,40 @@ function App() {
     void loadUser()
   }, [token])
 
+  const loadUsers = useCallback(async (activeToken = token) => {
+    if (!activeToken || currentUser?.role !== 'admin') {
+      return
+    }
+
+    setUsersLoading(true)
+    setUsersError(null)
+
+    try {
+      const data = await fetchUsers(activeToken)
+      setUsers(data)
+    } catch (err) {
+      setUsersError(
+        err instanceof Error ? err.message : 'Unable to load users.',
+      )
+    } finally {
+      setUsersLoading(false)
+    }
+  }, [currentUser?.role, token])
+
+  useEffect(() => {
+    if (!token || currentUser?.role !== 'admin') {
+      return
+    }
+
+    const activeToken = token
+
+    async function refreshUsers() {
+      await loadUsers(activeToken)
+    }
+
+    void refreshUsers()
+  }, [currentUser?.role, loadUsers, token])
+
   const loadDeployments = useCallback(async (activeToken = token) => {
     if (!activeToken) {
       return
@@ -171,6 +216,74 @@ function App() {
     localStorage.removeItem('platform-token')
     setToken(null)
     setCurrentUser(null)
+    setUsers([])
+  }
+
+  async function handleCreateUser(
+    username: string,
+    password: string,
+    role: UserRole,
+  ) {
+    if (!token) {
+      return
+    }
+
+    setUserAction('create')
+    setUsersError(null)
+
+    try {
+      await createUser(token, username, password, role)
+      await loadUsers(token)
+    } catch (err) {
+      setUsersError(
+        err instanceof Error ? err.message : 'Unable to create user.',
+      )
+    } finally {
+      setUserAction(null)
+    }
+  }
+
+  async function handleUpdateUser(
+    username: string,
+    payload: Partial<Pick<PlatformUser, 'role' | 'is_active'>>,
+  ) {
+    if (!token) {
+      return
+    }
+
+    setUserAction(username)
+    setUsersError(null)
+
+    try {
+      await updateUser(token, username, payload)
+      await loadUsers(token)
+    } catch (err) {
+      setUsersError(
+        err instanceof Error ? err.message : 'Unable to update user.',
+      )
+    } finally {
+      setUserAction(null)
+    }
+  }
+
+  async function handleDeleteUser(username: string) {
+    if (!token) {
+      return
+    }
+
+    setUserAction(username)
+    setUsersError(null)
+
+    try {
+      await deleteUser(token, username)
+      await loadUsers(token)
+    } catch (err) {
+      setUsersError(
+        err instanceof Error ? err.message : 'Unable to delete user.',
+      )
+    } finally {
+      setUserAction(null)
+    }
   }
 
   async function handleDeploy(model: ModelCatalogEntry) {
@@ -342,6 +455,15 @@ function App() {
           >
             Chat
           </NavigationButton>
+
+          {currentUser?.role === 'admin' && (
+            <NavigationButton
+              active={view === 'users'}
+              onClick={() => setView('users')}
+            >
+              Users
+            </NavigationButton>
+          )}
         </nav>
 
         <AuthPanel
@@ -395,6 +517,18 @@ function App() {
       )}
 
       {view === 'chat' && <ChatView />}
+
+      {view === 'users' && currentUser?.role === 'admin' && (
+        <UsersView
+          users={users}
+          loading={usersLoading}
+          error={usersError}
+          action={userAction}
+          onCreate={handleCreateUser}
+          onUpdate={handleUpdateUser}
+          onDelete={handleDeleteUser}
+        />
+      )}
     </main>
   )
 }
@@ -747,6 +881,158 @@ function AuthPanel({
       <button type="submit">Login</button>
       {error && <span className="auth-error">{error}</span>}
     </form>
+  )
+}
+
+function UsersView({
+  users,
+  loading,
+  error,
+  action,
+  onCreate,
+  onUpdate,
+  onDelete,
+}: {
+  users: PlatformUser[]
+  loading: boolean
+  error: string | null
+  action: string | null
+  onCreate: (username: string, password: string, role: UserRole) => void
+  onUpdate: (
+    username: string,
+    payload: Partial<Pick<PlatformUser, 'role' | 'is_active'>>,
+  ) => void
+  onDelete: (username: string) => void
+}) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [role, setRole] = useState<UserRole>('engineer')
+
+  return (
+    <>
+      <section className="hero">
+        <div>
+          <p className="eyebrow">Access control</p>
+          <h1>User Management</h1>
+          <p className="hero-copy">
+            Manage persistent platform accounts, roles, and active status for
+            operational access.
+          </p>
+        </div>
+
+        <SummaryCard label="Users" value={users.length} />
+      </section>
+
+      <section className="content">
+        <form
+          className="user-create-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+            onCreate(username, password, role)
+            setUsername('')
+            setPassword('')
+          }}
+        >
+          <input
+            aria-label="New username"
+            placeholder="username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+          />
+          <input
+            aria-label="New password"
+            placeholder="password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          <select
+            aria-label="New user role"
+            value={role}
+            onChange={(event) => setRole(event.target.value as UserRole)}
+          >
+            <option value="admin">Admin</option>
+            <option value="engineer">Engineer</option>
+            <option value="viewer">Viewer</option>
+          </select>
+          <button
+            type="submit"
+            className="action-button"
+            disabled={action === 'create'}
+          >
+            {action === 'create' ? 'Creating' : 'Create'}
+          </button>
+        </form>
+
+        {loading && <LoadingState message="Loading users..." />}
+
+        {error && (
+          <ErrorState title="Unable to manage users" message={error} />
+        )}
+
+        {!loading && !error && (
+          <div className="user-grid">
+            {users.map((user) => (
+              <article className="user-card" key={user.username}>
+                <div>
+                  <p className="model-id">{user.username}</p>
+                  <h3>{user.username}</h3>
+                </div>
+
+                <div className="user-controls">
+                  <select
+                    aria-label={`Role for ${user.username}`}
+                    value={user.role}
+                    disabled={action === user.username}
+                    onChange={(event) =>
+                      onUpdate(user.username, {
+                        role: event.target.value as UserRole,
+                      })
+                    }
+                  >
+                    <option value="admin">Admin</option>
+                    <option value="engineer">Engineer</option>
+                    <option value="viewer">Viewer</option>
+                  </select>
+
+                  <button
+                    type="button"
+                    className="action-button action-button-secondary"
+                    disabled={action === user.username}
+                    onClick={() =>
+                      onUpdate(user.username, {
+                        is_active: !user.is_active,
+                      })
+                    }
+                  >
+                    {user.is_active ? 'Disable' : 'Enable'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="action-button action-button-danger"
+                    disabled={action === user.username}
+                    onClick={() => onDelete(user.username)}
+                  >
+                    Delete
+                  </button>
+                </div>
+
+                <span
+                  className={
+                    user.is_active
+                      ? 'badge badge-enabled'
+                      : 'badge badge-disabled'
+                  }
+                >
+                  {user.is_active ? 'Active' : 'Disabled'}
+                </span>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </>
   )
 }
 

@@ -3,7 +3,8 @@
 from fastapi.testclient import TestClient
 
 from application.services.auth_service import AuthService
-from domain.auth.user import UserRole
+from domain.auth.user import PlatformUser, UserRole
+from infrastructure.persistence.in_memory_user_repository import InMemoryUserRepository
 from infrastructure.security.jwt_token_service import JWTTokenService
 from interfaces.http.app import app
 from interfaces.http.dependencies.auth import get_auth_service
@@ -30,10 +31,18 @@ class TestPasswordHasher:
 def create_test_auth_service(
     role: UserRole = UserRole.ADMIN,
 ) -> AuthService:
+    repository = InMemoryUserRepository(
+        (
+            PlatformUser(
+                username="admin",
+                password_hash=PASSWORD_HASH,
+                role=role,
+            ),
+        )
+    )
+
     return AuthService(
-        username="admin",
-        password_hash=PASSWORD_HASH,
-        role=role,
+        user_repository=repository,
         password_hasher=TestPasswordHasher(),
         token_service=JWTTokenService(
             secret_key=SECRET_KEY,

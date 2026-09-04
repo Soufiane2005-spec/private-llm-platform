@@ -7,15 +7,52 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from application.services.auth_exceptions import InvalidAccessTokenError
-from application.services.auth_service import AuthService
-from domain.auth.user import AuthUser, UserRole
+from application.services.auth_service import AuthService, UserManagementService
+from domain.auth.user import AuthUser, PlatformUser, UserRole
 from infrastructure.config import get_settings
+from infrastructure.persistence.sqlite_user_repository import SQLiteUserRepository
 from infrastructure.security.jwt_token_service import JWTTokenService
 from infrastructure.security.password_hasher import Argon2PasswordHasher
 
 _bearer_scheme = HTTPBearer(
     auto_error=False,
 )
+_user_repository: SQLiteUserRepository | None = None
+_password_hasher: Argon2PasswordHasher | None = None
+
+
+def get_user_repository() -> SQLiteUserRepository:
+    """Return the configured persistent user repository."""
+
+    global _user_repository
+
+    if _user_repository is None:
+        settings = get_settings()
+        repository = SQLiteUserRepository(settings.sqlite_database_path)
+
+        if repository.get(settings.auth_admin_username) is None:
+            repository.save(
+                PlatformUser(
+                    username=settings.auth_admin_username,
+                    password_hash=settings.auth_admin_password_hash,
+                    role=settings.auth_admin_role,
+                )
+            )
+
+        _user_repository = repository
+
+    return _user_repository
+
+
+def get_password_hasher() -> Argon2PasswordHasher:
+    """Return the configured password hasher."""
+
+    global _password_hasher
+
+    if _password_hasher is None:
+        _password_hasher = Argon2PasswordHasher()
+
+    return _password_hasher
 
 
 def create_auth_service() -> AuthService:
@@ -23,7 +60,7 @@ def create_auth_service() -> AuthService:
 
     settings = get_settings()
 
-    password_hasher = Argon2PasswordHasher()
+    password_hasher = get_password_hasher()
 
     token_service = JWTTokenService(
         secret_key=settings.auth_secret_key,
@@ -32,9 +69,7 @@ def create_auth_service() -> AuthService:
     )
 
     return AuthService(
-        username=settings.auth_admin_username,
-        password_hash=settings.auth_admin_password_hash,
-        role=settings.auth_admin_role,
+        user_repository=get_user_repository(),
         password_hasher=password_hasher,
         token_service=token_service,
     )
@@ -49,6 +84,21 @@ def get_auth_service() -> AuthService:
 AuthServiceDependency = Annotated[
     AuthService,
     Depends(get_auth_service),
+]
+
+
+def get_user_management_service() -> UserManagementService:
+    """Return the configured user management service."""
+
+    return UserManagementService(
+        user_repository=get_user_repository(),
+        password_hasher=get_password_hasher(),
+    )
+
+
+UserManagementServiceDependency = Annotated[
+    UserManagementService,
+    Depends(get_user_management_service),
 ]
 
 

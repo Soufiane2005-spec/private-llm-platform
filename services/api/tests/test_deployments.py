@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from application.services.auth_service import AuthService
 from application.services.job_service import JobService
 from application.services.model_deployment_service import ModelDeploymentService
-from domain.auth.user import UserRole
+from domain.auth.user import PlatformUser, UserRole
 from infrastructure.models.local_model_deployment_manager import (
     LocalModelDeploymentManager,
 )
@@ -13,6 +13,7 @@ from infrastructure.persistence.in_memory_job_repository import InMemoryJobRepos
 from infrastructure.persistence.in_memory_model_deployment_repository import (
     InMemoryModelDeploymentRepository,
 )
+from infrastructure.persistence.in_memory_user_repository import InMemoryUserRepository
 from infrastructure.queue.in_memory_job_queue import InMemoryJobQueue
 from infrastructure.security.jwt_token_service import JWTTokenService
 from interfaces.http.app import create_app
@@ -46,9 +47,15 @@ def create_client(role: UserRole = UserRole.ADMIN) -> TestClient:
         job_repository=job_repository,
     )
     auth_service = AuthService(
-        username="admin",
-        password_hash=PASSWORD_HASH,
-        role=role,
+        user_repository=InMemoryUserRepository(
+            (
+                PlatformUser(
+                    username="admin",
+                    password_hash=PASSWORD_HASH,
+                    role=role,
+                ),
+            )
+        ),
         password_hasher=TestPasswordHasher(),
         token_service=JWTTokenService(
             secret_key=SECRET_KEY,
