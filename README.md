@@ -134,6 +134,7 @@ Important variables:
 - `AUTH_ACCESS_TOKEN_EXPIRE_MINUTES`
 - `OLLAMA_BASE_URL`
 - `OLLAMA_TIMEOUT_SECONDS`
+- `CORS_ALLOWED_ORIGINS`
 
 Defaults are suitable for local development. Kubernetes should provide
 production secrets through Kubernetes Secrets, not committed `.env` files.

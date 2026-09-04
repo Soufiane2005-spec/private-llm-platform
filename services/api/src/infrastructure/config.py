@@ -9,6 +9,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from domain.auth.user import UserRole
 
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+DEFAULT_CORS_ALLOWED_ORIGINS = (
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
+)
 
 
 class AppEnvironment(StrEnum):
@@ -44,6 +52,17 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_timeout_seconds: float = 120.0
+    cors_allowed_origins: str = ",".join(DEFAULT_CORS_ALLOWED_ORIGINS)
+
+    @property
+    def allowed_cors_origins(self) -> tuple[str, ...]:
+        """Return configured browser origins allowed to call the API."""
+
+        return tuple(
+            origin.strip().rstrip("/")
+            for origin in self.cors_allowed_origins.split(",")
+            if origin.strip()
+        )
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,
