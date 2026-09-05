@@ -56,6 +56,7 @@ flowchart TD
 
 - `.github/workflows/`: CI/CD workflows.
 - `docs/`: technical notes and operational limitations.
+- `DEMO.md`: step-by-step final presentation script.
 - `frontend/`: React dashboard.
 - `infrastructure/docker/`: Docker Compose configurations for Ollama and vLLM.
 - `kubernetes/local/`: local Kind manifests for the platform.
