@@ -18,6 +18,7 @@ def create_record(benchmark_id: str) -> BenchmarkRecord:
             prompt_id="prompt-1",
             engine="vllm",
             latency_ms=500.0,
+            ttft_ms=125.0,
             tokens_generated=100,
             duration_seconds=2.0,
         ),

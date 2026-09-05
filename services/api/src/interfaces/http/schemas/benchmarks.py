@@ -1,6 +1,9 @@
 """HTTP schemas for benchmark endpoints."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+from domain.jobs.job import JobStatus
+from domain.models.llm_engine import LLMEngine
 
 
 class BenchmarkResourceResponse(BaseModel):
@@ -21,6 +24,7 @@ class BenchmarkResponse(BaseModel):
     prompt_id: str
     engine: str
     latency_ms: float
+    ttft_ms: float
     tokens_generated: int
     duration_seconds: float
     throughput_tokens_per_second: float
@@ -36,3 +40,27 @@ class BenchmarkReportResponse(BaseModel):
     average_cpu_percent: float
     average_memory_percent: float
     average_gpu_percent: float | None
+
+
+class BenchmarkRunRequest(BaseModel):
+    """Request payload for benchmark execution."""
+
+    model: str = Field(min_length=1, max_length=200)
+    engine: LLMEngine
+    prompts: list[str] = Field(min_length=1, max_length=20)
+
+
+class BenchmarkJobResponse(BaseModel):
+    """Job summary returned for benchmark execution."""
+
+    job_id: str
+    status: JobStatus
+    error: str | None
+
+
+class BenchmarkRunResponse(BaseModel):
+    """Benchmark execution response."""
+
+    job: BenchmarkJobResponse
+    records: list[BenchmarkResponse]
+    recommendation: str | None

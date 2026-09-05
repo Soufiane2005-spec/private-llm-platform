@@ -25,16 +25,17 @@ class SQLiteBenchmarkRepository:
                 """
                 insert into benchmark_records (
                     benchmark_id, model_id, prompt_id, engine, latency_ms,
-                    tokens_generated, duration_seconds, cpu_percent,
+                    ttft_ms, tokens_generated, duration_seconds, cpu_percent,
                     memory_percent, memory_used_bytes, gpu_percent,
                     gpu_memory_used_bytes
                 )
-                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 on conflict(benchmark_id) do update set
                     model_id = excluded.model_id,
                     prompt_id = excluded.prompt_id,
                     engine = excluded.engine,
                     latency_ms = excluded.latency_ms,
+                    ttft_ms = excluded.ttft_ms,
                     tokens_generated = excluded.tokens_generated,
                     duration_seconds = excluded.duration_seconds,
                     cpu_percent = excluded.cpu_percent,
@@ -49,6 +50,7 @@ class SQLiteBenchmarkRepository:
                     record.prompt_id,
                     record.engine,
                     record.latency_ms,
+                    record.result.ttft_ms,
                     record.result.tokens_generated,
                     record.result.duration_seconds,
                     record.resources.cpu_percent,
@@ -67,7 +69,7 @@ class SQLiteBenchmarkRepository:
             rows = connection.execute(
                 """
                 select benchmark_id, model_id, prompt_id, engine, latency_ms,
-                    tokens_generated, duration_seconds, cpu_percent,
+                    ttft_ms, tokens_generated, duration_seconds, cpu_percent,
                     memory_percent, memory_used_bytes, gpu_percent,
                     gpu_memory_used_bytes
                 from benchmark_records
@@ -87,6 +89,7 @@ class SQLiteBenchmarkRepository:
                     prompt_id text not null,
                     engine text not null,
                     latency_ms real not null,
+                    ttft_ms real not null default 0,
                     tokens_generated integer not null,
                     duration_seconds real not null,
                     cpu_percent real not null,
@@ -97,6 +100,21 @@ class SQLiteBenchmarkRepository:
                 )
                 """
             )
+            columns = {
+                row["name"]
+                for row in connection.execute(
+                    "pragma table_info(benchmark_records)"
+                ).fetchall()
+            }
+
+            if "ttft_ms" not in columns:
+                connection.execute(
+                    """
+                    alter table benchmark_records
+                    add column ttft_ms real not null default 0
+                    """
+                )
+
             connection.commit()
 
     def _connect(self) -> sqlite3.Connection:
@@ -113,6 +131,7 @@ class SQLiteBenchmarkRepository:
                 prompt_id=row["prompt_id"],
                 engine=row["engine"],
                 latency_ms=row["latency_ms"],
+                ttft_ms=row["ttft_ms"],
                 tokens_generated=row["tokens_generated"],
                 duration_seconds=row["duration_seconds"],
             ),

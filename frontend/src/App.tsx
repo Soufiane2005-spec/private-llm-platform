@@ -3,7 +3,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import './App.css'
 
 import { fetchCurrentUser, login } from './api/auth'
-import { fetchBenchmarkReport, fetchBenchmarks } from './api/benchmarks'
+import {
+  fetchBenchmarkReport,
+  fetchBenchmarks,
+  runBenchmark,
+} from './api/benchmarks'
 import {
   deployModel,
   fetchDeployments,
@@ -82,6 +86,10 @@ function App() {
     useState<BenchmarkReport | null>(null)
   const [benchmarksLoading, setBenchmarksLoading] = useState(true)
   const [benchmarksError, setBenchmarksError] = useState<string | null>(null)
+  const [benchmarkAction, setBenchmarkAction] = useState(false)
+  const [benchmarkRecommendation, setBenchmarkRecommendation] = useState<
+    string | null
+  >(null)
 
   const [monitoring, setMonitoring] =
     useState<MonitoringDashboard | null>(null)
@@ -104,6 +112,50 @@ function App() {
 
     void loadModels()
   }, [])
+
+  async function refreshBenchmarks() {
+    try {
+      const [records, report] = await Promise.all([
+        fetchBenchmarks(),
+        fetchBenchmarkReport(),
+      ])
+
+      setBenchmarks(records)
+      setBenchmarkReport(report)
+    } catch (err) {
+      setBenchmarksError(
+        err instanceof Error ? err.message : 'Unable to load benchmarks.',
+      )
+    }
+  }
+
+  async function handleRunBenchmark(
+    model: string,
+    engine: 'ollama' | 'vllm',
+    prompts: string[],
+  ) {
+    if (!token) {
+      setBenchmarksError('Login required.')
+      return
+    }
+
+    setBenchmarkAction(true)
+    setBenchmarksError(null)
+
+    try {
+      const result = await runBenchmark(token, model, engine, prompts)
+      setBenchmarkRecommendation(result.recommendation)
+      await refreshBenchmarks()
+      const data = await fetchJobs()
+      setJobs(data)
+    } catch (err) {
+      setBenchmarksError(
+        err instanceof Error ? err.message : 'Unable to run benchmark.',
+      )
+    } finally {
+      setBenchmarkAction(false)
+    }
+  }
 
   useEffect(() => {
     if (!token) {
@@ -505,6 +557,11 @@ function App() {
           report={benchmarkReport}
           loading={benchmarksLoading}
           error={benchmarksError}
+          models={models}
+          user={currentUser}
+          running={benchmarkAction}
+          recommendation={benchmarkRecommendation}
+          onRun={handleRunBenchmark}
         />
       )}
 
@@ -1150,6 +1207,15 @@ interface BenchmarksViewProps {
   report: BenchmarkReport | null
   loading: boolean
   error: string | null
+  models: ModelCatalogEntry[]
+  user: CurrentUser | null
+  running: boolean
+  recommendation: string | null
+  onRun: (
+    model: string,
+    engine: 'ollama' | 'vllm',
+    prompts: string[],
+  ) => void
 }
 
 function BenchmarksView({
@@ -1157,8 +1223,22 @@ function BenchmarksView({
   report,
   loading,
   error,
+  models,
+  user,
+  running,
+  recommendation,
+  onRun,
 }: BenchmarksViewProps) {
   const visibleBenchmarks = benchmarks.slice(-12)
+  const [selectedModel, setSelectedModel] = useState('')
+  const [promptText, setPromptText] = useState(
+    'Explain the difference between Ollama and vLLM in two sentences.',
+  )
+  const canRun = user?.role === 'admin' || user?.role === 'engineer'
+  const enabledModels = models.filter((model) => model.enabled)
+  const selectedCatalogModel =
+    enabledModels.find((model) => model.engine_model_id === selectedModel) ??
+    enabledModels[0]
 
   const latencyData: ChartDatum[] = visibleBenchmarks.map(
     (benchmark, index) => ({
@@ -1201,6 +1281,31 @@ function BenchmarksView({
       </section>
 
       <section className="content">
+        <BenchmarkRunForm
+          models={enabledModels}
+          selectedModel={selectedCatalogModel?.engine_model_id ?? ''}
+          promptText={promptText}
+          canRun={canRun}
+          running={running}
+          recommendation={recommendation}
+          onModelChange={setSelectedModel}
+          onPromptChange={setPromptText}
+          onRun={() => {
+            if (!selectedCatalogModel) {
+              return
+            }
+
+            onRun(
+              selectedCatalogModel.engine_model_id,
+              selectedCatalogModel.engine,
+              promptText
+                .split('\n')
+                .map((prompt) => prompt.trim())
+                .filter(Boolean),
+            )
+          }}
+        />
+
         {loading && <LoadingState message="Loading benchmark results..." />}
 
         {error && (
@@ -1476,6 +1581,78 @@ function BenchmarkSummary({
         unit={report.average_gpu_percent === null ? undefined : '%'}
       />
     </div>
+  )
+}
+
+function BenchmarkRunForm({
+  models,
+  selectedModel,
+  promptText,
+  canRun,
+  running,
+  recommendation,
+  onModelChange,
+  onPromptChange,
+  onRun,
+}: {
+  models: ModelCatalogEntry[]
+  selectedModel: string
+  promptText: string
+  canRun: boolean
+  running: boolean
+  recommendation: string | null
+  onModelChange: (model: string) => void
+  onPromptChange: (prompt: string) => void
+  onRun: () => void
+}) {
+  return (
+    <form
+      className="benchmark-run-form"
+      onSubmit={(event) => {
+        event.preventDefault()
+        onRun()
+      }}
+    >
+      <div className="benchmark-run-controls">
+        <select
+          aria-label="Benchmark model"
+          value={selectedModel}
+          disabled={!canRun || running || models.length === 0}
+          onChange={(event) => onModelChange(event.target.value)}
+        >
+          {models.map((model) => (
+            <option key={model.model_id} value={model.engine_model_id}>
+              {model.display_name} ({model.engine})
+            </option>
+          ))}
+        </select>
+
+        <button
+          type="submit"
+          className="action-button"
+          disabled={!canRun || running || models.length === 0}
+        >
+          {running ? 'Running' : 'Run benchmark'}
+        </button>
+      </div>
+
+      <textarea
+        aria-label="Benchmark prompts"
+        value={promptText}
+        disabled={!canRun || running}
+        onChange={(event) => onPromptChange(event.target.value)}
+      />
+
+      {!canRun && (
+        <p className="form-note">
+          Login as admin or engineer to run benchmarks.
+        </p>
+      )}
+
+      {recommendation && (
+        <p className="form-note form-note-strong">{recommendation}</p>
+      )}
+    </form>
   )
 }
 
@@ -1831,6 +2008,11 @@ function BenchmarkCard({
         <div>
           <span>Latency</span>
           <strong>{formatNumber(benchmark.latency_ms)} ms</strong>
+        </div>
+
+        <div>
+          <span>TTFT</span>
+          <strong>{formatNumber(benchmark.ttft_ms)} ms</strong>
         </div>
 
         <div>
