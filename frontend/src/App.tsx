@@ -13,7 +13,12 @@ import {
   fetchDeployments,
   runDeploymentAction,
 } from './api/deployments'
-import { fetchJobs } from './api/job'
+import {
+  fetchDeadLetterJobs,
+  fetchJobs,
+  fetchJobRuntime,
+  runNextJob,
+} from './api/job'
 import { fetchModels } from './api/models'
 import { fetchMonitoringDashboard } from './api/monitoring'
 import {
@@ -28,7 +33,7 @@ import type {
   BenchmarkRecord,
   BenchmarkReport,
 } from './types/benchmark'
-import type { Job, JobStatus } from './types/job'
+import type { Job, JobRuntime, JobStatus } from './types/job'
 import type { ModelCatalogEntry } from './types/model'
 import type { MonitoringDashboard } from './types/monitoring'
 import type { ModelDeployment } from './types/deployment'
@@ -78,8 +83,14 @@ function App() {
   const [deploymentAction, setDeploymentAction] = useState<string | null>(null)
 
   const [jobs, setJobs] = useState<Job[]>([])
+  const [jobRuntime, setJobRuntime] = useState<JobRuntime>({
+    queue_size: 0,
+    dead_letter_size: 0,
+  })
+  const [deadLetterJobs, setDeadLetterJobs] = useState<Job[]>([])
   const [jobsLoading, setJobsLoading] = useState(true)
   const [jobsError, setJobsError] = useState<string | null>(null)
+  const [jobWorkerAction, setJobWorkerAction] = useState(false)
 
   const [benchmarks, setBenchmarks] = useState<BenchmarkRecord[]>([])
   const [benchmarkReport, setBenchmarkReport] =
@@ -129,6 +140,18 @@ function App() {
     }
   }
 
+  const refreshJobs = useCallback(async () => {
+    const [jobData, runtimeData, deadLetterData] = await Promise.all([
+      fetchJobs(),
+      fetchJobRuntime(),
+      fetchDeadLetterJobs(),
+    ])
+
+    setJobs(jobData)
+    setJobRuntime(runtimeData)
+    setDeadLetterJobs(deadLetterData)
+  }, [])
+
   async function handleRunBenchmark(
     model: string,
     engine: 'ollama' | 'vllm',
@@ -146,8 +169,7 @@ function App() {
       const result = await runBenchmark(token, model, engine, prompts)
       setBenchmarkRecommendation(result.recommendation)
       await refreshBenchmarks()
-      const data = await fetchJobs()
-      setJobs(data)
+      await refreshJobs()
     } catch (err) {
       setBenchmarksError(
         err instanceof Error ? err.message : 'Unable to run benchmark.',
@@ -350,8 +372,7 @@ function App() {
     try {
       await deployModel(token, model.engine_model_id, model.engine)
       await loadDeployments(token)
-      const data = await fetchJobs()
-      setJobs(data)
+      await refreshJobs()
     } catch (err) {
       setDeploymentsError(
         err instanceof Error ? err.message : 'Deploy failed.',
@@ -376,8 +397,7 @@ function App() {
     try {
       await runDeploymentAction(token, deploymentId, action)
       await loadDeployments(token)
-      const data = await fetchJobs()
-      setJobs(data)
+      await refreshJobs()
     } catch (err) {
       setDeploymentsError(
         err instanceof Error ? err.message : `${action} failed.`,
@@ -390,8 +410,7 @@ function App() {
   useEffect(() => {
     async function loadJobs() {
       try {
-        const data = await fetchJobs()
-        setJobs(data)
+        await refreshJobs()
       } catch (err) {
         setJobsError(
           err instanceof Error ? err.message : 'Unable to load jobs.',
@@ -402,7 +421,23 @@ function App() {
     }
 
     void loadJobs()
-  }, [])
+  }, [refreshJobs])
+
+  async function handleRunNextJob() {
+    setJobWorkerAction(true)
+    setJobsError(null)
+
+    try {
+      await runNextJob()
+      await refreshJobs()
+    } catch (err) {
+      setJobsError(
+        err instanceof Error ? err.message : 'Unable to run next job.',
+      )
+    } finally {
+      setJobWorkerAction(false)
+    }
+  }
 
   useEffect(() => {
     async function loadBenchmarks() {
@@ -548,6 +583,10 @@ function App() {
           loading={jobsLoading}
           error={jobsError}
           counts={jobCounts}
+          runtime={jobRuntime}
+          deadLetterJobs={deadLetterJobs}
+          workerAction={jobWorkerAction}
+          onRunNext={handleRunNextJob}
         />
       )}
 
@@ -1098,6 +1137,10 @@ interface JobsViewProps {
   loading: boolean
   error: string | null
   counts: Record<JobStatus, number>
+  runtime: JobRuntime
+  deadLetterJobs: Job[]
+  workerAction: boolean
+  onRunNext: () => void
 }
 
 function JobsView({
@@ -1105,6 +1148,10 @@ function JobsView({
   loading,
   error,
   counts,
+  runtime,
+  deadLetterJobs,
+  workerAction,
+  onRunNext,
 }: JobsViewProps) {
   return (
     <>
@@ -1127,6 +1174,8 @@ function JobsView({
           <MetricCard label="Running" value={counts.running} />
           <MetricCard label="Completed" value={counts.completed} />
           <MetricCard label="Failed" value={counts.failed} />
+          <MetricCard label="Queued" value={runtime.queue_size} />
+          <MetricCard label="Dead-letter" value={runtime.dead_letter_size} />
         </div>
 
         <div className="section-heading jobs-heading">
@@ -1136,7 +1185,17 @@ function JobsView({
           </div>
 
           {!loading && !error && (
-            <span className="status">{jobs.length} tracked</span>
+            <div className="section-actions">
+              <span className="status">{jobs.length} tracked</span>
+              <button
+                className="action-button action-button-secondary"
+                type="button"
+                onClick={onRunNext}
+                disabled={workerAction || runtime.queue_size === 0}
+              >
+                {workerAction ? 'Running...' : 'Run next'}
+              </button>
+            </div>
           )}
         </div>
 
@@ -1196,6 +1255,41 @@ function JobsView({
               </article>
             ))}
           </div>
+        )}
+
+        {!loading && !error && deadLetterJobs.length > 0 && (
+          <>
+            <div className="section-heading jobs-heading">
+              <div>
+                <p className="eyebrow">Dead-letter</p>
+                <h2>Failed jobs</h2>
+              </div>
+
+              <span className="status">{deadLetterJobs.length} retained</span>
+            </div>
+
+            <div className="job-grid">
+              {deadLetterJobs.map((job) => (
+                <article className="job-card" key={`dead-${job.job_id}`}>
+                  <div className="job-card-header">
+                    <div>
+                      <p className="job-id">{job.job_id}</p>
+                      <h3>{formatJobType(job.job_type)}</h3>
+                    </div>
+
+                    <JobStatusBadge status={job.status} />
+                  </div>
+
+                  {job.error && (
+                    <div className="job-error">
+                      <span>Error</span>
+                      <p>{job.error}</p>
+                    </div>
+                  )}
+                </article>
+              ))}
+            </div>
+          </>
         )}
       </section>
     </>

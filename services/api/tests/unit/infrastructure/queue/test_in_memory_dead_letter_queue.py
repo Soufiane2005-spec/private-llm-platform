@@ -29,6 +29,7 @@ def test_dead_letter_queue_adds_failed_job() -> None:
     queue.add(job)
 
     assert queue.size() == 1
+    assert queue.list() == (job,)
     assert queue.get_next() == job
     assert queue.size() == 0
 
@@ -42,6 +43,7 @@ def test_dead_letter_queue_is_fifo() -> None:
     queue.add(first)
     queue.add(second)
 
+    assert queue.list() == (first, second)
     assert queue.get_next() == first
     assert queue.get_next() == second
     assert queue.get_next() is None

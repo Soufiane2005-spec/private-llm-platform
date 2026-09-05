@@ -191,6 +191,12 @@ h1 {
   font-size: 1.8rem;
 }
 
+.section-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .jobs-heading,
 .benchmark-heading {
   margin-top: 42px;

@@ -3,6 +3,9 @@ from domain.jobs.job import Job, JobStatus
 from infrastructure.persistence.in_memory_job_repository import (
     InMemoryJobRepository,
 )
+from infrastructure.queue.in_memory_dead_letter_queue import (
+    InMemoryDeadLetterQueue,
+)
 from infrastructure.queue.in_memory_job_queue import InMemoryJobQueue
 
 
@@ -75,3 +78,66 @@ def test_get_returns_none_for_unknown_job() -> None:
     )
 
     assert service.get("missing") is None
+
+
+def test_service_exposes_queue_and_dead_letter_counts() -> None:
+    queue = InMemoryJobQueue()
+    dead_letter_queue = InMemoryDeadLetterQueue()
+    service = JobService(
+        queue=queue,
+        repository=InMemoryJobRepository(),
+        dead_letter_queue=dead_letter_queue,
+    )
+
+    service.submit("benchmark")
+
+    assert service.queue_size() == 1
+    assert service.dead_letter_size() == 0
+    assert service.list_dead_letters() == ()
+
+
+def test_service_run_once_completes_next_job() -> None:
+    service = JobService(
+        queue=InMemoryJobQueue(),
+        repository=InMemoryJobRepository(),
+        dead_letter_queue=InMemoryDeadLetterQueue(),
+    )
+    job = service.submit("benchmark")
+
+    result = service.run_once()
+
+    assert result is not None
+    assert result.job_id == job.job_id
+    assert result.status is JobStatus.COMPLETED
+    assert service.queue_size() == 0
+
+
+def test_service_run_once_records_dead_letter_after_permanent_failure() -> None:
+    service = JobService(
+        queue=InMemoryJobQueue(),
+        repository=InMemoryJobRepository(),
+        dead_letter_queue=InMemoryDeadLetterQueue(),
+        handler=lambda job: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+    service.submit("benchmark", max_attempts=1)
+
+    result = service.run_once()
+
+    assert result is not None
+    assert result.status is JobStatus.FAILED
+    assert service.dead_letter_size() == 1
+    assert service.list_dead_letters() == (result,)
+
+
+def test_service_run_once_requires_dead_letter_queue() -> None:
+    service = JobService(
+        queue=InMemoryJobQueue(),
+        repository=InMemoryJobRepository(),
+    )
+
+    try:
+        service.run_once()
+    except RuntimeError as exc:
+        assert str(exc) == "dead letter queue is required to run jobs."
+    else:
+        raise AssertionError("Expected RuntimeError when worker has no DLQ.")
