@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     ollama_timeout_seconds: float = 120.0
     cors_allowed_origins: str = ",".join(DEFAULT_CORS_ALLOWED_ORIGINS)
     database_url: str = "sqlite:///./data/platform.db"
+    prometheus_base_url: str | None = None
 
     @property
     def allowed_cors_origins(self) -> tuple[str, ...]:

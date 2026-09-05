@@ -9,7 +9,21 @@ export interface EngineStatus {
   status: string
 }
 
+export interface PodStatus {
+  namespace: string
+  name: string
+  ready: boolean
+}
+
+export interface MonitoringAlert {
+  name: string
+  severity: string | null
+  state: string
+}
+
 export interface MonitoringDashboard {
   resources: MonitoringResources
   engines: EngineStatus[]
+  pods: PodStatus[]
+  alerts: MonitoringAlert[]
 }

@@ -1531,6 +1531,73 @@ function MonitoringView({
                 />
               ))}
             </div>
+
+            <div className="section-heading monitoring-engine-heading">
+              <div>
+                <p className="eyebrow">Kubernetes</p>
+                <h2>Pods</h2>
+              </div>
+
+              <span className="status">
+                {monitoring.pods.length} observed
+              </span>
+            </div>
+
+            <div className="engine-status-grid">
+              {monitoring.pods.map((pod) => (
+                <article className="engine-status-card" key={pod.name}>
+                  <div>
+                    <p className="engine-status-label">{pod.namespace}</p>
+                    <h3>{pod.name}</h3>
+                  </div>
+
+                  <span
+                    className={`runtime-status ${
+                      pod.ready ? 'runtime-running' : 'runtime-failed'
+                    }`}
+                  >
+                    <span className="runtime-status-dot" />
+                    {pod.ready ? 'Ready' : 'Not ready'}
+                  </span>
+                </article>
+              ))}
+            </div>
+
+            <div className="section-heading monitoring-engine-heading">
+              <div>
+                <p className="eyebrow">Alerting</p>
+                <h2>Alerts</h2>
+              </div>
+
+              <span className="status">
+                {monitoring.alerts.length} firing
+              </span>
+            </div>
+
+            {monitoring.alerts.length === 0 ? (
+              <EmptyState
+                title="No firing alerts"
+                message="Prometheus firing alerts will appear here when the monitoring provider is configured."
+              />
+            ) : (
+              <div className="job-grid">
+                {monitoring.alerts.map((alert) => (
+                  <article className="job-card" key={alert.name}>
+                    <div className="job-card-header">
+                      <div>
+                        <p className="job-id">{alert.severity ?? 'unknown'}</p>
+                        <h3>{alert.name}</h3>
+                      </div>
+
+                      <span className="runtime-status runtime-failed">
+                        <span className="runtime-status-dot" />
+                        {alert.state}
+                      </span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </>
         )}
       </section>

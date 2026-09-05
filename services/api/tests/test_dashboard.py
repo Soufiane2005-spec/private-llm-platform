@@ -89,6 +89,8 @@ def test_dashboard_endpoint_returns_monitoring_data(
                 "status": "unavailable",
             },
         ],
+        "pods": [],
+        "alerts": [],
     }
 
 
