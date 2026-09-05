@@ -8,6 +8,10 @@ from application.services.job_service import JobService
 from application.services.model_deployment_service import ModelDeploymentService
 from domain.jobs.job import Job
 from domain.models.deployment import ModelDeployment
+from infrastructure.config import get_settings
+from infrastructure.models.kubernetes_model_deployment_manager import (
+    KubernetesModelDeploymentManager,
+)
 from infrastructure.models.local_model_deployment_manager import (
     LocalModelDeploymentManager,
 )
@@ -30,9 +34,14 @@ _deployment_repository = get_persistent_deployment_repository()
 _job_repository = get_persistent_job_repository()
 _job_queue = InMemoryJobQueue()
 _job_service = JobService(queue=_job_queue, repository=_job_repository)
+_settings = get_settings()
 _deployment_service = ModelDeploymentService(
     deployments=_deployment_repository,
-    manager=LocalModelDeploymentManager(gpu_available=False),
+    manager=(
+        KubernetesModelDeploymentManager(namespace=_settings.kubernetes_namespace)
+        if _settings.model_deployment_backend == "kubernetes"
+        else LocalModelDeploymentManager(gpu_available=False)
+    ),
     jobs=_job_service,
     job_repository=_job_repository,
 )

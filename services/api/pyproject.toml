@@ -15,6 +15,7 @@ dependencies = [
     "PyJWT>=2.10,<3.0",
     "pwdlib[argon2]>=0.3,<0.4",
     "httpx>=0.28.1,<0.29",
+    "kubernetes>=30,<35",
 ]
 
 [project.optional-dependencies]

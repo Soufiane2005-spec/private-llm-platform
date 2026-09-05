@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     cors_allowed_origins: str = ",".join(DEFAULT_CORS_ALLOWED_ORIGINS)
     database_url: str = "sqlite:///./data/platform.db"
     prometheus_base_url: str | None = None
+    model_deployment_backend: str = "local"
+    kubernetes_namespace: str = "llm-platform"
 
     @property
     def allowed_cors_origins(self) -> tuple[str, ...]:
