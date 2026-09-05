@@ -410,6 +410,35 @@ Kind clusters that use `kindnet` accept NetworkPolicy resources but do not
 prove policy enforcement. Use a CNI such as Calico or Cilium to validate actual
 traffic isolation.
 
+## Proxmox
+
+Reproducible Proxmox scaffolding is provided in:
+
+```text
+infrastructure/terraform/proxmox/
+infrastructure/ansible/
+```
+
+The Terraform configuration clones cloud-init capable VMs for control-plane,
+worker and GPU-worker roles using the `bpg/proxmox` provider. The Ansible
+playbook prepares those VMs for a Kubernetes installation by configuring guest
+agent support, kernel modules, sysctl networking settings and swap.
+
+No Proxmox host or credentials are available in this development environment,
+so provisioning is not claimed as runtime validated. Validate it against a real
+Proxmox lab with:
+
+```powershell
+cd infrastructure\terraform\proxmox
+terraform init
+terraform fmt -check
+terraform validate
+terraform plan
+
+cd ..\..\ansible
+ansible-playbook -i inventory.ini site.yaml --check
+```
+
 ## CI/CD
 
 Workflows:
@@ -486,6 +515,9 @@ kubectl apply --dry-run=server -f kubernetes/local
 - The local demo worker is triggered through `POST /jobs/run-next`; production
   deployments should replace the in-process queue with a durable external
   queue and a separately managed worker process.
+- Proxmox Terraform and Ansible files require real Proxmox credentials and
+  hosts; they are provided as reproducible IaC but are not runtime-provisioned
+  in this environment.
 - vLLM runtime requires an NVIDIA GPU-enabled Kubernetes node.
 - HPA runtime requires Metrics Server or another `metrics.k8s.io`
   implementation.

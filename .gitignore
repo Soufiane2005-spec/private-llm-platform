@@ -44,10 +44,13 @@ dist/
 .terraform/
 *.tfstate
 *.tfstate.*
+*.tfvars
+!*.tfvars.example
 
 # Secrets
 *.pem
 *.key
+infrastructure/ansible/inventory.ini
 
 # Temporary
 tmp/

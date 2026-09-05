@@ -1,0 +1,41 @@
+proxmox_endpoint     = "https://pve.example.local:8006/"
+proxmox_api_token    = "terraform@pve!private-llm=<store-secret-outside-git>"
+proxmox_tls_insecure = true
+proxmox_node_name    = "pve"
+template_vm_id       = 9000
+
+disk_datastore_id       = "local-lvm"
+cloud_init_datastore_id = "local-lvm"
+network_bridge          = "vmbr0"
+ssh_username            = "ubuntu"
+ssh_public_keys         = ["ssh-ed25519 AAAA... replace-with-your-public-key"]
+gateway_ipv4            = "192.168.1.1"
+
+cluster_nodes = {
+  "llm-control-01" = {
+    vm_id        = 2101
+    role         = "control-plane"
+    cpu_cores    = 4
+    memory_mb    = 8192
+    disk_gb      = 80
+    ipv4_address = "192.168.1.51/24"
+  }
+
+  "llm-worker-01" = {
+    vm_id        = 2102
+    role         = "worker"
+    cpu_cores    = 4
+    memory_mb    = 8192
+    disk_gb      = 80
+    ipv4_address = "192.168.1.52/24"
+  }
+
+  "llm-gpu-01" = {
+    vm_id        = 2103
+    role         = "gpu-worker"
+    cpu_cores    = 8
+    memory_mb    = 24576
+    disk_gb      = 160
+    ipv4_address = "192.168.1.53/24"
+  }
+}
