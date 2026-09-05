@@ -18,12 +18,29 @@ spec:
         app: test-app
 
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+
       containers:
         - name: nginx
-          image: nginx:1.30.4-alpine
+          image: nginxinc/nginx-unprivileged:1.29-alpine
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 101
+            runAsGroup: 101
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
 
           ports:
-            - containerPort: 80
+            - containerPort: 8080
 
           resources:
             requests:
@@ -32,3 +49,23 @@ spec:
             limits:
               cpu: "200m"
               memory: "128Mi"
+
+          volumeMounts:
+            - name: cache
+              mountPath: /var/cache/nginx
+
+            - name: run
+              mountPath: /var/run
+
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: cache
+          emptyDir: {}
+
+        - name: run
+          emptyDir: {}
+
+        - name: tmp
+          emptyDir: {}
