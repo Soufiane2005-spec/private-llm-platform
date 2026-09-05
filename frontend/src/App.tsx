@@ -62,6 +62,9 @@ interface EngineBenchmarkAverage {
   gpu: number | null
 }
 
+const GRAFANA_URL =
+  import.meta.env.VITE_GRAFANA_URL ?? 'http://127.0.0.1:3000'
+
 function App() {
   const [view, setView] = useState<View>('models')
   const [token, setToken] = useState<string | null>(
@@ -1571,7 +1574,17 @@ function MonitoringView({
                 <h2>System Usage</h2>
               </div>
 
-              <span className="status">Live snapshot</span>
+              <div className="section-actions">
+                <span className="status">Live snapshot</span>
+                <a
+                  className="action-button action-button-secondary"
+                  href={GRAFANA_URL}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open Grafana
+                </a>
+              </div>
             </div>
 
             <div className="monitoring-resource-grid">
