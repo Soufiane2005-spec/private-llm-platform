@@ -2,7 +2,7 @@
 
 import pytest
 
-from domain.auth.user import AuthUser, UserRole
+from domain.auth.user import AuthUser, PlatformUser, UserRole
 
 
 def test_auth_user_is_created_with_role() -> None:
@@ -41,3 +41,12 @@ def test_supported_user_roles() -> None:
     assert UserRole.ADMIN.value == "admin"
     assert UserRole.ENGINEER.value == "engineer"
     assert UserRole.VIEWER.value == "viewer"
+
+
+def test_platform_user_requires_password_hash() -> None:
+    with pytest.raises(ValueError, match="password_hash cannot be empty"):
+        PlatformUser(
+            username="admin",
+            password_hash=" ",
+            role=UserRole.ADMIN,
+        )

@@ -12,6 +12,7 @@ export interface BenchmarkRecord {
   prompt_id: string
   engine: string
   latency_ms: number
+  ttft_ms: number
   tokens_generated: number
   duration_seconds: number
   throughput_tokens_per_second: number
@@ -25,4 +26,14 @@ export interface BenchmarkReport {
   average_cpu_percent: number
   average_memory_percent: number
   average_gpu_percent: number | null
+}
+
+export interface BenchmarkRunResponse {
+  job: {
+    job_id: string
+    status: string
+    error: string | null
+  }
+  records: BenchmarkRecord[]
+  recommendation: string | null
 }

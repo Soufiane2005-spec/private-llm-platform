@@ -15,6 +15,7 @@ def test_benchmark_result_can_be_created() -> None:
     assert result.prompt_id == "prompt-1"
     assert result.engine == "ollama"
     assert result.latency_ms == 125.5
+    assert result.ttft_ms == 0.0
     assert result.tokens_generated == 0
     assert result.duration_seconds == 0.0
     assert result.throughput_tokens_per_second == 0.0
@@ -120,6 +121,19 @@ def test_benchmark_result_rejects_negative_tokens() -> None:
             engine="ollama",
             latency_ms=100.0,
             tokens_generated=-1,
+        )
+
+
+def test_benchmark_result_rejects_negative_ttft() -> None:
+    with pytest.raises(
+        ValueError,
+        match="ttft_ms cannot be negative",
+    ):
+        BenchmarkResult(
+            prompt_id="prompt-1",
+            engine="ollama",
+            latency_ms=100.0,
+            ttft_ms=-1.0,
         )
 
 

@@ -28,4 +28,20 @@ class DashboardService:
                 }
                 for engine in engines
             ],
+            "pods": [
+                {
+                    "namespace": pod.namespace,
+                    "name": pod.name,
+                    "ready": pod.ready,
+                }
+                for pod in getattr(self._resource_monitor, "get_pod_statuses", lambda: ())()
+            ],
+            "alerts": [
+                {
+                    "name": alert.name,
+                    "severity": alert.severity,
+                    "state": alert.state,
+                }
+                for alert in getattr(self._resource_monitor, "get_alerts", lambda: ())()
+            ],
         }

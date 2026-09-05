@@ -23,6 +23,10 @@ class InMemoryDeadLetterQueue:
 
         return self._jobs.popleft()
 
+    def list(self) -> tuple[Job, ...]:
+        """Return failed jobs without removing them."""
+        return tuple(self._jobs)
+
     def size(self) -> int:
         """Return the number of dead-lettered jobs."""
         return len(self._jobs)

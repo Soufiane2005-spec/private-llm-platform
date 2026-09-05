@@ -32,3 +32,4 @@ kubectl describe nodes | grep nvidia.com/gpu
 kubectl get pods -A | grep nvidia
 kubectl apply -f kubernetes/local/vllm-deployment.yaml
 kubectl get pods -n llm-platform
+```

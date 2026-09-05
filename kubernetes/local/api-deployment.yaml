@@ -25,6 +25,7 @@ spec:
         app: api
 
     spec:
+      serviceAccountName: platform-engineer
       terminationGracePeriodSeconds: 30
 
       topologySpreadConstraints:
@@ -57,6 +58,33 @@ spec:
 
           ports:
             - containerPort: 8000
+
+          env:
+            - name: AUTH_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: platform-secrets
+                  key: AUTH_SECRET_KEY
+                  optional: true
+
+            - name: AUTH_ADMIN_PASSWORD_HASH
+              valueFrom:
+                secretKeyRef:
+                  name: platform-secrets
+                  key: AUTH_ADMIN_PASSWORD_HASH
+                  optional: true
+
+            - name: OLLAMA_BASE_URL
+              value: http://ollama:11434
+
+            - name: PROMETHEUS_BASE_URL
+              value: http://monitoring-kube-prometheus-prometheus.monitoring:9090
+
+            - name: MODEL_DEPLOYMENT_BACKEND
+              value: kubernetes
+
+            - name: KUBERNETES_NAMESPACE
+              value: llm-platform
 
           lifecycle:
             preStop:

@@ -7,7 +7,8 @@ from application.services.auth_exceptions import (
     InvalidCredentialsError,
 )
 from application.services.auth_service import AuthService
-from domain.auth.user import UserRole
+from domain.auth.user import PlatformUser, UserRole
+from infrastructure.persistence.in_memory_user_repository import InMemoryUserRepository
 
 
 class FakePasswordHasher:
@@ -22,6 +23,9 @@ class FakePasswordHasher:
             password == "correct-password"
             and password_hash == "stored-hash"
         )
+
+    def hash(self, password: str) -> str:
+        return f"hashed:{password}"
 
 
 class FakeTokenService:
@@ -59,41 +63,43 @@ def create_service(
     *,
     role: UserRole = UserRole.ADMIN,
     token_service: FakeTokenService | None = None,
+    is_active: bool = True,
 ) -> AuthService:
+    repository = InMemoryUserRepository(
+        (
+            PlatformUser(
+                username="admin",
+                password_hash="stored-hash",
+                role=role,
+                is_active=is_active,
+            ),
+        )
+    )
+
     return AuthService(
-        username="admin",
-        password_hash="stored-hash",
-        role=role,
+        user_repository=repository,
         password_hasher=FakePasswordHasher(),
         token_service=token_service or FakeTokenService(),
     )
 
 
 def test_auth_service_rejects_empty_username() -> None:
-    with pytest.raises(
-        ValueError,
-        match="username cannot be empty",
-    ):
-        AuthService(
-            username="",
-            password_hash="stored-hash",
-            role=UserRole.ADMIN,
-            password_hasher=FakePasswordHasher(),
-            token_service=FakeTokenService(),
-        )
+    service = AuthService(
+        user_repository=InMemoryUserRepository(),
+        password_hasher=FakePasswordHasher(),
+        token_service=FakeTokenService(),
+    )
+
+    with pytest.raises(InvalidCredentialsError):
+        service.authenticate("", "correct-password")
 
 
 def test_auth_service_rejects_empty_password_hash() -> None:
-    with pytest.raises(
-        ValueError,
-        match="password_hash cannot be empty",
-    ):
-        AuthService(
+    with pytest.raises(ValueError, match="password_hash cannot be empty"):
+        PlatformUser(
             username="admin",
             password_hash="",
             role=UserRole.ADMIN,
-            password_hasher=FakePasswordHasher(),
-            token_service=FakeTokenService(),
         )
 
 
@@ -127,6 +133,16 @@ def test_authenticate_rejects_wrong_password() -> None:
         service.authenticate(
             username="admin",
             password="wrong-password",
+        )
+
+
+def test_authenticate_rejects_disabled_user() -> None:
+    service = create_service(is_active=False)
+
+    with pytest.raises(InvalidCredentialsError):
+        service.authenticate(
+            username="admin",
+            password="correct-password",
         )
 
 
@@ -171,5 +187,20 @@ def test_get_current_user_rejects_wrong_role() -> None:
     with pytest.raises(
         InvalidAccessTokenError,
         match="token role does not match",
+    ):
+        service.get_current_user("valid-token")
+
+
+def test_get_current_user_rejects_disabled_subject() -> None:
+    service = create_service(
+        is_active=False,
+        token_service=FakeTokenService(
+            identity=("admin", UserRole.ADMIN),
+        ),
+    )
+
+    with pytest.raises(
+        InvalidAccessTokenError,
+        match="token subject is disabled",
     ):
         service.get_current_user("valid-token")

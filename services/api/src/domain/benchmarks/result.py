@@ -10,6 +10,7 @@ class BenchmarkResult:
     prompt_id: str
     engine: str
     latency_ms: float
+    ttft_ms: float = 0.0
     tokens_generated: int = 0
     duration_seconds: float = 0.0
 
@@ -24,6 +25,9 @@ class BenchmarkResult:
 
         if self.latency_ms < 0:
             raise ValueError("latency_ms cannot be negative.")
+
+        if self.ttft_ms < 0:
+            raise ValueError("ttft_ms cannot be negative.")
 
         if self.tokens_generated < 0:
             raise ValueError("tokens_generated cannot be negative.")

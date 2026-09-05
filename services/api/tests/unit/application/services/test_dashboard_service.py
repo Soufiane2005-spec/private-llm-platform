@@ -79,6 +79,8 @@ def test_dashboard_returns_resource_metrics_and_engine_states() -> None:
                 "status": "unavailable",
             },
         ],
+        "pods": [],
+        "alerts": [],
     }
 
 

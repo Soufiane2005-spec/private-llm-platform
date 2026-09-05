@@ -16,6 +16,10 @@ class DeadLetterQueue(Protocol):
         """Retrieve and remove the oldest dead-lettered job."""
         ...
 
+    def list(self) -> tuple[Job, ...]:
+        """Return dead-lettered jobs without removing them."""
+        ...
+
     def size(self) -> int:
         """Return the number of dead-lettered jobs."""
         ...

@@ -14,11 +14,12 @@ dependencies = [
     "psutil>=7.0,<8.0",
     "PyJWT>=2.10,<3.0",
     "pwdlib[argon2]>=0.3,<0.4",
+    "httpx>=0.28.1,<0.29",
+    "kubernetes>=30,<35",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "httpx>=0.28.1,<0.29",
     "pytest>=9.1,<10",
     "pytest-cov>=7.1,<8",
     "ruff>=0.16,<0.17",

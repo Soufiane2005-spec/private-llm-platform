@@ -18,8 +18,26 @@ class DashboardEngineSchema(BaseModel):
     status: str
 
 
+class DashboardPodSchema(BaseModel):
+    """Kubernetes pod status exposed by monitoring."""
+
+    namespace: str
+    name: str
+    ready: bool
+
+
+class DashboardAlertSchema(BaseModel):
+    """Active Prometheus alert exposed by monitoring."""
+
+    name: str
+    severity: str | None
+    state: str
+
+
 class DashboardResponseSchema(BaseModel):
     """Aggregated dashboard response."""
 
     resources: DashboardResourcesSchema
     engines: list[DashboardEngineSchema]
+    pods: list[DashboardPodSchema] = []
+    alerts: list[DashboardAlertSchema] = []
