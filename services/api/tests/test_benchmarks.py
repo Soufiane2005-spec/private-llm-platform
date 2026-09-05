@@ -1,5 +1,7 @@
 """HTTP tests for benchmark endpoints."""
 
+from datetime import UTC, datetime
+
 from fastapi.testclient import TestClient
 
 from application.services.auth_service import AuthService
@@ -99,11 +101,23 @@ def create_record() -> BenchmarkRecord:
             gpu_percent=70.0,
             gpu_memory_used_bytes=2048,
         ),
+        prompt="hello",
+        created_at=datetime(2026, 9, 5, 12, 0, tzinfo=UTC),
     )
 
 
 class FakeBenchmarkExecutionService:
     """Fake execution service for HTTP tests."""
+
+    def start(self, *, model, engine, prompts):
+        return Job(
+            job_id="job-1",
+            job_type="benchmark:vllm:qwen3-0.6b",
+            status=JobStatus.PENDING,
+        )
+
+    def execute_job(self, *, job_id, model, engine, prompts):
+        return (create_record(),)
 
     def run(self, *, model, engine, prompts):
         return (
@@ -138,9 +152,9 @@ def test_run_benchmark_returns_job_records_and_recommendation() -> None:
 
     assert response.status_code == 202
     body = response.json()
-    assert body["job"]["status"] == "completed"
-    assert body["records"][0]["ttft_ms"] == 125.0
-    assert body["recommendation"]
+    assert body["job"]["status"] == "pending"
+    assert body["records"] == []
+    assert body["recommendation"] is None
 
 
 def test_list_benchmarks_returns_empty_list() -> None:
@@ -168,12 +182,18 @@ def test_list_benchmarks_returns_records() -> None:
             "benchmark_id": "benchmark-1",
             "model_id": "qwen3-0.6b",
             "prompt_id": "prompt-1",
+            "prompt": "hello",
+            "timestamp": "2026-09-05T12:00:00Z",
             "engine": "vllm",
             "latency_ms": 500.0,
             "ttft_ms": 125.0,
             "tokens_generated": 100,
             "duration_seconds": 2.0,
+            "prompt_tokens": None,
+            "prompt_eval_duration_seconds": None,
             "throughput_tokens_per_second": 50.0,
+            "success": True,
+            "error": None,
             "resources": {
                 "cpu_percent": 40.0,
                 "memory_percent": 50.0,
@@ -213,3 +233,15 @@ def test_get_benchmark_report_returns_aggregated_metrics() -> None:
         "average_memory_percent": 50.0,
         "average_gpu_percent": 70.0,
     }
+
+
+def test_get_benchmark_returns_record_by_id() -> None:
+    repository = InMemoryBenchmarkRepository()
+    repository.save(create_record())
+
+    client = create_test_client(repository)
+
+    response = client.get("/benchmarks/benchmark-1")
+
+    assert response.status_code == 200
+    assert response.json()["benchmark_id"] == "benchmark-1"

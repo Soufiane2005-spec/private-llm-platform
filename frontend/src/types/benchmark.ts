@@ -10,12 +10,18 @@ export interface BenchmarkRecord {
   benchmark_id: string
   model_id: string
   prompt_id: string
+  prompt: string
+  timestamp: string
   engine: string
   latency_ms: number
   ttft_ms: number
   tokens_generated: number
   duration_seconds: number
+  prompt_tokens: number | null
+  prompt_eval_duration_seconds: number | null
   throughput_tokens_per_second: number
+  success: boolean
+  error: string | null
   resources: BenchmarkResources
 }
 

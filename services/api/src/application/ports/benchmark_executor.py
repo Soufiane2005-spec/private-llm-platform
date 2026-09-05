@@ -12,6 +12,8 @@ class BenchmarkExecution:
     ttft_ms: float
     tokens_generated: int
     duration_seconds: float
+    prompt_tokens: int | None = None
+    prompt_eval_duration_seconds: float | None = None
 
 
 class BenchmarkExecutor(Protocol):

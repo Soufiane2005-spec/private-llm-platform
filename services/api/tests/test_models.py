@@ -15,10 +15,10 @@ def test_list_models_returns_default_catalog() -> None:
     assert response.status_code == 200
     assert response.json() == [
         {
-            "model_id": "llama-3.2-1b",
-            "display_name": "Llama 3.2 1B",
+            "model_id": "qwen2.5-1.5b",
+            "display_name": "Qwen2.5 1.5B",
             "engine": "ollama",
-            "engine_model_id": "llama3.2:1b",
+            "engine_model_id": "qwen2.5:1.5b",
             "context_length": None,
             "enabled": True,
         },

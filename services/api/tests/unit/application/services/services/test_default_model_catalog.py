@@ -10,7 +10,7 @@ def test_default_catalog_contains_supported_models() -> None:
     models = catalog.list_models()
 
     assert tuple(model.model_id for model in models) == (
-        "llama-3.2-1b",
+        "qwen2.5-1.5b",
         "qwen3-0.6b",
     )
 
@@ -18,11 +18,11 @@ def test_default_catalog_contains_supported_models() -> None:
 def test_default_catalog_maps_models_to_expected_engines() -> None:
     catalog = create_default_model_catalog()
 
-    llama = catalog.get("llama-3.2-1b")
+    qwen_ollama = catalog.get("qwen2.5-1.5b")
     qwen = catalog.get("qwen3-0.6b")
 
-    assert llama.engine is LLMEngine.OLLAMA
-    assert llama.engine_model_id == "llama3.2:1b"
+    assert qwen_ollama.engine is LLMEngine.OLLAMA
+    assert qwen_ollama.engine_model_id == "qwen2.5:1.5b"
 
     assert qwen.engine is LLMEngine.VLLM
     assert qwen.engine_model_id == "Qwen/Qwen3-0.6B"

@@ -97,7 +97,7 @@ class FakeCoreApi:
 def deployment(engine: LLMEngine = LLMEngine.OLLAMA) -> ModelDeployment:
     """Return a valid deployment fixture."""
 
-    model = "llama3.2:1b" if engine is LLMEngine.OLLAMA else "Qwen/Qwen3-0.6B"
+    model = "qwen2.5:1.5b" if engine is LLMEngine.OLLAMA else "Qwen/Qwen3-0.6B"
     return ModelDeployment(
         deployment_id="deployment-1",
         model=model,
@@ -105,10 +105,10 @@ def deployment(engine: LLMEngine = LLMEngine.OLLAMA) -> ModelDeployment:
     )
 
 
-def test_deploy_ollama_creates_kubernetes_deployment_when_missing() -> None:
-    """Ollama deployments are created and mapped to running when ready."""
+def test_deploy_ollama_scales_existing_runtime() -> None:
+    """Ollama deployments use the existing service-backed runtime."""
 
-    apps_api = FakeAppsApi(exists=False, ready=1, desired=1)
+    apps_api = FakeAppsApi(exists=True, ready=1, desired=1)
     manager = KubernetesModelDeploymentManager(
         namespace="llm-platform",
         apps_api=apps_api,
@@ -117,10 +117,14 @@ def test_deploy_ollama_creates_kubernetes_deployment_when_missing() -> None:
 
     result = manager.deploy(deployment())
 
-    assert len(apps_api.created) == 1
-    body = apps_api.created[0]["body"]
-    assert body["metadata"]["namespace"] == "llm-platform"
-    assert body["spec"]["template"]["spec"]["containers"][0]["name"] == "ollama"
+    assert apps_api.created == []
+    assert apps_api.scales == [
+        {
+            "name": "ollama",
+            "namespace": "llm-platform",
+            "body": {"spec": {"replicas": 1}},
+        }
+    ]
     assert result.status is ModelDeploymentStatus.RUNNING
     assert result.runtime_state == "ready:1/1"
 
