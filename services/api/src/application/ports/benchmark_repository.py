@@ -15,3 +15,7 @@ class BenchmarkRepository(Protocol):
     def list(self) -> tuple[BenchmarkRecord, ...]:
         """Return all benchmark records."""
         ...
+
+    def get(self, benchmark_id: str) -> BenchmarkRecord | None:
+        """Return one benchmark record by identifier."""
+        ...

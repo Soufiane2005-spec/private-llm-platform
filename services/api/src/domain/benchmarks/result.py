@@ -13,6 +13,8 @@ class BenchmarkResult:
     ttft_ms: float = 0.0
     tokens_generated: int = 0
     duration_seconds: float = 0.0
+    prompt_tokens: int | None = None
+    prompt_eval_duration_seconds: float | None = None
 
     def __post_init__(self) -> None:
         """Validate benchmark result invariants."""
@@ -34,6 +36,15 @@ class BenchmarkResult:
 
         if self.duration_seconds < 0:
             raise ValueError("duration_seconds cannot be negative.")
+
+        if self.prompt_tokens is not None and self.prompt_tokens < 0:
+            raise ValueError("prompt_tokens cannot be negative.")
+
+        if (
+            self.prompt_eval_duration_seconds is not None
+            and self.prompt_eval_duration_seconds < 0
+        ):
+            raise ValueError("prompt_eval_duration_seconds cannot be negative.")
 
         if self.tokens_generated > 0 and self.duration_seconds <= 0:
             raise ValueError(

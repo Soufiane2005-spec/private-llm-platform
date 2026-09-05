@@ -1,5 +1,7 @@
 """HTTP schemas for benchmark endpoints."""
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 from domain.jobs.job import JobStatus
@@ -22,12 +24,18 @@ class BenchmarkResponse(BaseModel):
     benchmark_id: str
     model_id: str
     prompt_id: str
+    prompt: str
+    timestamp: datetime
     engine: str
     latency_ms: float
     ttft_ms: float
     tokens_generated: int
     duration_seconds: float
+    prompt_tokens: int | None
+    prompt_eval_duration_seconds: float | None
     throughput_tokens_per_second: float
+    success: bool
+    error: str | None
     resources: BenchmarkResourceResponse
 
 

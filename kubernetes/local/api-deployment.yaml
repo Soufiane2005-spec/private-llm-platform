@@ -46,8 +46,8 @@ spec:
 
       containers:
         - name: api
-          image: ghcr.io/soufiane2005-spec/private-llm-api:0a9a27da996fdadf3399a92c3ab84c602cab327b
-          imagePullPolicy: Always
+          image: private-llm-api:final
+          imagePullPolicy: IfNotPresent
 
           securityContext:
             allowPrivilegeEscalation: false
@@ -129,7 +129,12 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: api-data
+              mountPath: /app/data
 
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: api-data
+          persistentVolumeClaim:
+            claimName: api-data

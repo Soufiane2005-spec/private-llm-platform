@@ -21,3 +21,8 @@ class InMemoryBenchmarkRepository:
             self._records[benchmark_id]
             for benchmark_id in sorted(self._records)
         )
+
+    def get(self, benchmark_id: str) -> BenchmarkRecord | None:
+        """Return one benchmark record by identifier."""
+
+        return self._records.get(benchmark_id)

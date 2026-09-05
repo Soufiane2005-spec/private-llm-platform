@@ -34,6 +34,10 @@ class KubernetesModelDeploymentManager:
     def deploy(self, deployment: ModelDeployment) -> ModelDeployment:
         """Create or update a Kubernetes Deployment for the model."""
 
+        if deployment.engine is LLMEngine.OLLAMA:
+            self._scale(deployment, replicas=1)
+            return self._status_from_kubernetes(deployment)
+
         if deployment.engine is LLMEngine.VLLM and not self._gpu_available():
             return deployment.with_status(
                 ModelDeploymentStatus.FAILED,
@@ -271,6 +275,9 @@ class KubernetesModelDeploymentManager:
 
     @staticmethod
     def _resource_name(deployment: ModelDeployment) -> str:
+        if deployment.engine is LLMEngine.OLLAMA:
+            return "ollama"
+
         clean_model = (
             deployment.model.lower()
             .replace("/", "-")

@@ -21,6 +21,11 @@ class BenchmarkQueryService:
 
         return self._repository.list()
 
+    def get_record(self, benchmark_id: str) -> BenchmarkRecord | None:
+        """Return one stored benchmark record by identifier."""
+
+        return self._repository.get(benchmark_id)
+
     def generate_report(self) -> BenchmarkReport | None:
         """Generate a report for stored benchmarks."""
 

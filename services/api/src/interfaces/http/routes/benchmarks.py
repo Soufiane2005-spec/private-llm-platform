@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from application.services.benchmark_execution_service import BenchmarkExecutionService
 from application.services.benchmark_query_service import BenchmarkQueryService
@@ -76,12 +76,18 @@ def _record_response(record: BenchmarkRecord) -> BenchmarkResponse:
         benchmark_id=record.benchmark_id,
         model_id=record.model_id,
         prompt_id=record.prompt_id,
+        prompt=record.prompt,
+        timestamp=record.timestamp,
         engine=record.engine,
         latency_ms=record.result.latency_ms,
         ttft_ms=record.result.ttft_ms,
         tokens_generated=record.result.tokens_generated,
         duration_seconds=record.result.duration_seconds,
+        prompt_tokens=record.result.prompt_tokens,
+        prompt_eval_duration_seconds=record.result.prompt_eval_duration_seconds,
         throughput_tokens_per_second=record.throughput_tokens_per_second,
+        success=record.success,
+        error=record.error,
         resources=BenchmarkResourceResponse(
             cpu_percent=record.resources.cpu_percent,
             memory_percent=record.resources.memory_percent,
@@ -116,13 +122,14 @@ def list_benchmarks(
 )
 def run_benchmark(
     request: BenchmarkRunRequest,
+    background_tasks: BackgroundTasks,
     _user: EngineerUserDependency,
     service: BenchmarkExecutionServiceDependency,
 ) -> BenchmarkRunResponse:
     """Run and persist a benchmark suite."""
 
     try:
-        records, job = service.run(
+        job = service.start(
             model=request.model,
             engine=request.engine,
             prompts=tuple(request.prompts),
@@ -130,11 +137,31 @@ def run_benchmark(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    background_tasks.add_task(
+        service.execute_job,
+        job_id=job.job_id,
+        model=request.model,
+        engine=request.engine,
+        prompts=tuple(request.prompts),
+    )
+
     return BenchmarkRunResponse(
         job=_job_response(job),
-        records=[_record_response(record) for record in records],
-        recommendation=_recommend(records),
+        records=[],
+        recommendation=None,
     )
+
+
+@router.get(
+    "/compare",
+    response_model=BenchmarkReportResponse | None,
+)
+def compare_benchmarks(
+    service: BenchmarkServiceDependency,
+) -> BenchmarkReportResponse | None:
+    """Return aggregate data for comparing benchmark results."""
+
+    return get_benchmark_report(service)
 
 
 @router.get(
@@ -161,6 +188,24 @@ def get_benchmark_report(
         average_memory_percent=report.average_memory_percent,
         average_gpu_percent=report.average_gpu_percent,
     )
+
+
+@router.get("/{benchmark_id}", response_model=BenchmarkResponse)
+def get_benchmark(
+    benchmark_id: str,
+    service: BenchmarkServiceDependency,
+) -> BenchmarkResponse:
+    """Return a single benchmark result."""
+
+    record = service.get_record(benchmark_id)
+
+    if record is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Benchmark result not found.",
+        )
+
+    return _record_response(record)
 
 
 def _recommend(records: tuple[BenchmarkRecord, ...]) -> str | None:

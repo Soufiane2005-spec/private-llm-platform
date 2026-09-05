@@ -1,5 +1,6 @@
 """Application service for benchmark execution and persistence."""
 
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from application.ports.benchmark_executor import BenchmarkExecutor
@@ -74,11 +75,77 @@ class BenchmarkExecutionService:
         self._job_repository.save(completed)
         return records, completed
 
+    def start(
+        self,
+        *,
+        model: str,
+        engine: LLMEngine,
+        prompts: tuple[str, ...],
+    ) -> Job:
+        """Create a pending benchmark job for background execution."""
+
+        self._validate_request(model=model, prompts=prompts)
+        return self._jobs.submit(
+            f"benchmark:{engine.value}:{model}",
+            enqueue=False,
+        )
+
+    def execute_job(
+        self,
+        *,
+        job_id: str,
+        model: str,
+        engine: LLMEngine,
+        prompts: tuple[str, ...],
+    ) -> tuple[BenchmarkRecord, ...]:
+        """Execute a pending benchmark job and persist its records."""
+
+        self._validate_request(model=model, prompts=prompts)
+        job = self._job_repository.get(job_id)
+
+        if job is None:
+            raise ValueError("benchmark job was not found.")
+
+        running = job.mark_running().register_attempt()
+        self._job_repository.save(running)
+
+        try:
+            executor = self._executor_for(engine)
+            records = tuple(
+                self._run_prompt(
+                    executor=executor,
+                    model=model,
+                    prompt=prompt,
+                    index=index,
+                    engine=engine,
+                )
+                for index, prompt in enumerate(prompts, start=1)
+            )
+        except Exception as exc:
+            failed = running.mark_failed(str(exc))
+            self._job_repository.save(failed)
+            return ()
+
+        for record in records:
+            self._repository.save(record)
+
+        completed = running.mark_completed()
+        self._job_repository.save(completed)
+        return records
+
     def _executor_for(self, engine: LLMEngine) -> BenchmarkExecutor:
         if engine is LLMEngine.OLLAMA:
             return self._ollama_executor
 
         raise ValueError("vLLM benchmark execution requires a configured GPU runtime.")
+
+    @staticmethod
+    def _validate_request(*, model: str, prompts: tuple[str, ...]) -> None:
+        if not model.strip():
+            raise ValueError("model cannot be empty.")
+
+        if not prompts:
+            raise ValueError("at least one prompt is required.")
 
     def _run_prompt(
         self,
@@ -105,8 +172,16 @@ class BenchmarkExecutionService:
                 ttft_ms=execution.ttft_ms,
                 tokens_generated=execution.tokens_generated,
                 duration_seconds=execution.duration_seconds,
+                prompt_tokens=execution.prompt_tokens,
+                prompt_eval_duration_seconds=(
+                    execution.prompt_eval_duration_seconds
+                ),
             ),
             resources=resources,
+            prompt=prompt,
+            created_at=datetime.now(UTC),
+            success=True,
+            error=None,
         )
 
     def _sample_resources(self) -> BenchmarkResourceMetrics:

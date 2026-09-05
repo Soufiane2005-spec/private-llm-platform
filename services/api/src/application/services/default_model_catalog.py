@@ -11,10 +11,10 @@ def create_default_model_catalog() -> ModelCatalog:
     return ModelCatalog(
         [
             ModelCatalogEntry(
-                model_id="llama-3.2-1b",
-                display_name="Llama 3.2 1B",
+                model_id="qwen2.5-1.5b",
+                display_name="Qwen2.5 1.5B",
                 engine=LLMEngine.OLLAMA,
-                engine_model_id="llama3.2:1b",
+                engine_model_id="qwen2.5:1.5b",
             ),
             ModelCatalogEntry(
                 model_id="qwen3-0.6b",

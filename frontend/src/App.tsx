@@ -6,6 +6,7 @@ import { fetchCurrentUser, login } from './api/auth'
 import {
   fetchBenchmarkReport,
   fetchBenchmarks,
+  fetchBenchmarkJob,
   runBenchmark,
 } from './api/benchmarks'
 import {
@@ -170,6 +171,12 @@ function App() {
 
     try {
       const result = await runBenchmark(token, model, engine, prompts)
+      const job = await waitForBenchmarkJob(result.job.job_id)
+
+      if (job.status === 'failed') {
+        throw new Error(job.error ?? 'Benchmark job failed.')
+      }
+
       setBenchmarkRecommendation(result.recommendation)
       await refreshBenchmarks()
       await refreshJobs()
@@ -180,6 +187,20 @@ function App() {
     } finally {
       setBenchmarkAction(false)
     }
+  }
+
+  async function waitForBenchmarkJob(jobId: string) {
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const job = await fetchBenchmarkJob(jobId)
+
+      if (job.status === 'completed' || job.status === 'failed') {
+        return job
+      }
+
+      await new Promise((resolve) => window.setTimeout(resolve, 1000))
+    }
+
+    throw new Error('Benchmark job did not finish before the UI timeout.')
   }
 
   useEffect(() => {
@@ -2209,12 +2230,26 @@ function BenchmarkCard({
       <dl className="benchmark-details">
         <div>
           <dt>Prompt</dt>
-          <dd>{benchmark.prompt_id}</dd>
+          <dd>{benchmark.prompt || benchmark.prompt_id}</dd>
         </div>
 
         <div>
           <dt>Tokens generated</dt>
           <dd>{benchmark.tokens_generated.toLocaleString()}</dd>
+        </div>
+
+        <div>
+          <dt>Prompt tokens</dt>
+          <dd>
+            {benchmark.prompt_tokens === null
+              ? 'Not available'
+              : benchmark.prompt_tokens.toLocaleString()}
+          </dd>
+        </div>
+
+        <div>
+          <dt>Timestamp</dt>
+          <dd>{new Date(benchmark.timestamp).toLocaleString()}</dd>
         </div>
 
         <div>
