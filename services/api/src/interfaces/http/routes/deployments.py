@@ -11,9 +11,9 @@ from domain.models.deployment import ModelDeployment
 from infrastructure.models.local_model_deployment_manager import (
     LocalModelDeploymentManager,
 )
-from infrastructure.persistence.in_memory_job_repository import InMemoryJobRepository
-from infrastructure.persistence.in_memory_model_deployment_repository import (
-    InMemoryModelDeploymentRepository,
+from infrastructure.persistence.factory import (
+    get_persistent_deployment_repository,
+    get_persistent_job_repository,
 )
 from infrastructure.queue.in_memory_job_queue import InMemoryJobQueue
 from interfaces.http.dependencies.auth import EngineerUserDependency, ViewerUserDependency
@@ -26,8 +26,8 @@ from interfaces.http.schemas.deployments import (
 
 router = APIRouter(prefix="/deployments", tags=["deployments"])
 
-_deployment_repository = InMemoryModelDeploymentRepository()
-_job_repository = InMemoryJobRepository()
+_deployment_repository = get_persistent_deployment_repository()
+_job_repository = get_persistent_job_repository()
 _job_queue = InMemoryJobQueue()
 _job_service = JobService(queue=_job_queue, repository=_job_repository)
 _deployment_service = ModelDeploymentService(

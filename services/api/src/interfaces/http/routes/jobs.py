@@ -6,15 +6,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from application.services.job_service import JobService
 from domain.jobs.job import Job
-from infrastructure.persistence.in_memory_job_repository import (
-    InMemoryJobRepository,
-)
+from infrastructure.persistence.factory import get_persistent_job_repository
 from infrastructure.queue.in_memory_job_queue import InMemoryJobQueue
 from interfaces.http.schemas.jobs import JobCreateRequest, JobResponse
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
-_repository = InMemoryJobRepository()
+_repository = get_persistent_job_repository()
 _queue = InMemoryJobQueue()
 _service = JobService(queue=_queue, repository=_repository)
 

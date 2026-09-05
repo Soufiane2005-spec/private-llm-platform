@@ -5,9 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from application.services.benchmark_query_service import BenchmarkQueryService
-from infrastructure.persistence.in_memory_benchmark_repository import (
-    InMemoryBenchmarkRepository,
-)
+from infrastructure.persistence.factory import get_persistent_benchmark_repository
 from interfaces.http.schemas.benchmarks import (
     BenchmarkReportResponse,
     BenchmarkResourceResponse,
@@ -16,7 +14,7 @@ from interfaces.http.schemas.benchmarks import (
 
 router = APIRouter(prefix="/benchmarks", tags=["benchmarks"])
 
-_repository = InMemoryBenchmarkRepository()
+_repository = get_persistent_benchmark_repository()
 _service = BenchmarkQueryService(repository=_repository)
 
 
