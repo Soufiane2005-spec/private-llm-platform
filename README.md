@@ -89,10 +89,16 @@ Main endpoints:
 - `POST /chat`
 - `GET /jobs`
 - `POST /jobs`
+- `GET /jobs/runtime`
+- `POST /jobs/run-next`
+- `GET /jobs/dead-letter`
 - `GET /jobs/{job_id}`
 - `GET /benchmarks`
+- `POST /benchmarks`
 - `GET /benchmarks/report`
 - `GET /dashboard`
+- `GET /deployments`
+- `POST /deployments`
 - `POST /auth/login`
 - `GET /auth/me`
 - `GET /auth/rbac/admin`
@@ -409,6 +415,8 @@ traffic isolation.
 Workflows:
 
 - `.github/workflows/api-image.yaml`: API image build and GHCR push.
+- `.github/workflows/application-ci.yaml`: backend Ruff/Pytest and frontend
+  lint/build.
 - `.github/workflows/docker-compose-ci.yaml`: Ollama Compose validation.
 - `.github/workflows/infrastructure-ci.yaml`: Kubernetes YAML, kubeconform,
   resources, HPA, security context, PDB, rollout and secret-file checks.
@@ -431,19 +439,21 @@ Suggested final demo flow:
 2. Show `GET /health/live` and `GET /health/ready`.
 3. Show `GET /models`.
 4. Submit a job with `POST /jobs`, then show `GET /jobs`.
-5. Show benchmark empty state or existing records without fake data.
-6. Ask `/chat`: `Comment retrouver une demande ?`
-7. Confirm non-empty reply and sources such as `demo_faq.md`.
-8. Ask `/chat`: `astronomie galaxie satellite`.
-9. Confirm strict fallback and `sources=[]`.
-10. Show Ollama tags and direct generation.
-11. Delete the Ollama pod and confirm the model is still present after
+5. Show `GET /jobs/runtime`, run `POST /jobs/run-next`, then inspect
+   `GET /jobs/dead-letter` if a job fails permanently.
+6. Show benchmark empty state or existing records without fake data.
+7. Ask `/chat`: `Comment retrouver une demande ?`
+8. Confirm non-empty reply and sources such as `demo_faq.md`.
+9. Ask `/chat`: `astronomie galaxie satellite`.
+10. Confirm strict fallback and `sources=[]`.
+11. Show Ollama tags and direct generation.
+12. Delete the Ollama pod and confirm the model is still present after
     recreation.
-12. Show auth login, `/auth/me`, and RBAC endpoints without displaying JWTs.
-13. Show Kubernetes pods, services, PVC, EndpointSlices, PDB, HPA and
+13. Show auth login, `/auth/me`, and RBAC endpoints without displaying JWTs.
+14. Show Kubernetes pods, services, PVC, EndpointSlices, PDB, HPA and
     NetworkPolicies.
-14. Show monitoring pods and the project PrometheusRule.
-15. State runtime limitations honestly: HPA needs Metrics Server, vLLM needs
+15. Show monitoring pods and the project PrometheusRule.
+16. State runtime limitations honestly: HPA needs Metrics Server, vLLM needs
     GPU, and NetworkPolicy enforcement needs an enforcing CNI.
 
 ## Final Validation Checklist
@@ -473,9 +483,9 @@ kubectl apply --dry-run=server -f kubernetes/local
 - RAG is a local file-based demonstration, not a production vector search
   pipeline.
 - Demo Markdown files are fictional and not official documentation.
-- Benchmark persistence is in memory in the current API runtime.
-- Jobs are submitted and tracked in memory; background execution depends on the
-  worker integration path.
+- The local demo worker is triggered through `POST /jobs/run-next`; production
+  deployments should replace the in-process queue with a durable external
+  queue and a separately managed worker process.
 - vLLM runtime requires an NVIDIA GPU-enabled Kubernetes node.
 - HPA runtime requires Metrics Server or another `metrics.k8s.io`
   implementation.

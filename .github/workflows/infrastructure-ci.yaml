@@ -221,12 +221,15 @@ jobs:
           for manifest in \
             kubernetes/local/api-deployment.yaml \
             kubernetes/local/ollama-deployment.yaml \
+            kubernetes/local/test-app-deployment.yaml \
+            kubernetes/local/metrics-server.yaml \
             kubernetes/local/vllm-deployment.yaml; do
 
             echo "Checking ${manifest}"
 
             seccomp=$(yq -r \
-              '.spec.template.spec.securityContext.seccompProfile.type' \
+              'select(.kind == "Deployment") |
+               .spec.template.spec.securityContext.seccompProfile.type' \
               "${manifest}")
 
             if [[ "${seccomp}" != "RuntimeDefault" ]]; then
@@ -235,24 +238,29 @@ jobs:
             fi
 
             container_count=$(yq \
-              '.spec.template.spec.containers | length' \
+              'select(.kind == "Deployment") |
+               .spec.template.spec.containers | length' \
               "${manifest}")
 
             for ((i=0; i<container_count; i++)); do
               name=$(yq -r \
-                ".spec.template.spec.containers[$i].name" \
+                "select(.kind == \"Deployment\") |
+                 .spec.template.spec.containers[$i].name" \
                 "${manifest}")
 
               allow_privilege=$(yq -r \
-                ".spec.template.spec.containers[$i].securityContext.allowPrivilegeEscalation" \
+                "select(.kind == \"Deployment\") |
+                 .spec.template.spec.containers[$i].securityContext.allowPrivilegeEscalation" \
                 "${manifest}")
 
               read_only=$(yq -r \
-                ".spec.template.spec.containers[$i].securityContext.readOnlyRootFilesystem" \
+                "select(.kind == \"Deployment\") |
+                 .spec.template.spec.containers[$i].securityContext.readOnlyRootFilesystem" \
                 "${manifest}")
 
               drops_all=$(yq -r \
-                ".spec.template.spec.containers[$i].securityContext.capabilities.drop[]? |
+                "select(.kind == \"Deployment\") |
+                 .spec.template.spec.containers[$i].securityContext.capabilities.drop[]? |
                  select(. == \"ALL\")" \
                 "${manifest}")
 
