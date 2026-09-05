@@ -392,6 +392,7 @@ Local policies cover:
 - default egress deny
 - DNS egress
 - API egress to Ollama and vLLM
+- API egress to Prometheus and the local Kubernetes API
 - API ingress to Ollama and vLLM services
 - vLLM HTTPS egress for model download
 
@@ -401,6 +402,8 @@ Apply and validate:
 kubectl apply -f kubernetes/local/default-deny-egress.yaml
 kubectl apply -f kubernetes/local/allow-dns-egress.yaml
 kubectl apply -f kubernetes/local/allow-api-llm-egress.yaml
+kubectl apply -f kubernetes/local/allow-api-to-prometheus.yaml
+kubectl apply -f kubernetes/local/allow-api-to-kubernetes-api.yaml
 kubectl apply -f kubernetes/local/allow-api-to-ollama.yaml
 kubectl apply -f kubernetes/local/allow-api-to-vllm.yaml
 kubectl apply -f kubernetes/local/allow-vllm-external-https.yaml
