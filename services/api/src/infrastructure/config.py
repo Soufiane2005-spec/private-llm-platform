@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     prometheus_base_url: str | None = None
     model_deployment_backend: str = "local"
     kubernetes_namespace: str = "llm-platform"
+    model_operation_timeout_seconds: float = 120.0
 
     @property
     def allowed_cors_origins(self) -> tuple[str, ...]:

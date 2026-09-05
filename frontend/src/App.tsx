@@ -421,6 +421,12 @@ function App() {
     }
 
     void loadJobs()
+
+    const interval = window.setInterval(() => {
+      void refreshJobs()
+    }, 5000)
+
+    return () => window.clearInterval(interval)
   }, [refreshJobs])
 
   async function handleRunNextJob() {

@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from application.services.job_service import JobService
 from application.services.model_deployment_service import ModelDeploymentService
@@ -44,6 +44,7 @@ _deployment_service = ModelDeploymentService(
     ),
     jobs=_job_service,
     job_repository=_job_repository,
+    timeout_seconds=_settings.model_operation_timeout_seconds,
 )
 
 
@@ -109,6 +110,7 @@ def list_deployments(
 )
 def deploy_model(
     request: DeploymentCreateRequest,
+    background_tasks: BackgroundTasks,
     _user: EngineerUserDependency,
     service: DeploymentServiceDependency,
 ) -> DeploymentOperationResponse:
@@ -121,6 +123,12 @@ def deploy_model(
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    background_tasks.add_task(
+        service.execute_deploy,
+        deployment.deployment_id,
+        job.job_id,
+    )
 
     return _operation_response(deployment, job)
 
@@ -144,6 +152,7 @@ def get_deployment(
 @router.post("/{deployment_id}/start", response_model=DeploymentOperationResponse)
 def start_deployment(
     deployment_id: str,
+    background_tasks: BackgroundTasks,
     _user: EngineerUserDependency,
     service: DeploymentServiceDependency,
 ) -> DeploymentOperationResponse:
@@ -154,12 +163,15 @@ def start_deployment(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Deployment not found.") from exc
 
+    background_tasks.add_task(service.execute_start, deployment_id, job.job_id)
+
     return _operation_response(deployment, job)
 
 
 @router.post("/{deployment_id}/stop", response_model=DeploymentOperationResponse)
 def stop_deployment(
     deployment_id: str,
+    background_tasks: BackgroundTasks,
     _user: EngineerUserDependency,
     service: DeploymentServiceDependency,
 ) -> DeploymentOperationResponse:
@@ -170,12 +182,15 @@ def stop_deployment(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Deployment not found.") from exc
 
+    background_tasks.add_task(service.execute_stop, deployment_id, job.job_id)
+
     return _operation_response(deployment, job)
 
 
 @router.post("/{deployment_id}/restart", response_model=DeploymentOperationResponse)
 def restart_deployment(
     deployment_id: str,
+    background_tasks: BackgroundTasks,
     _user: EngineerUserDependency,
     service: DeploymentServiceDependency,
 ) -> DeploymentOperationResponse:
@@ -186,12 +201,15 @@ def restart_deployment(
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Deployment not found.") from exc
 
+    background_tasks.add_task(service.execute_restart, deployment_id, job.job_id)
+
     return _operation_response(deployment, job)
 
 
 @router.delete("/{deployment_id}", response_model=DeploymentOperationResponse)
 def delete_deployment(
     deployment_id: str,
+    background_tasks: BackgroundTasks,
     _user: EngineerUserDependency,
     service: DeploymentServiceDependency,
 ) -> DeploymentOperationResponse:
@@ -201,5 +219,7 @@ def delete_deployment(
         job = service.delete(deployment_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Deployment not found.") from exc
+
+    background_tasks.add_task(service.execute_delete, deployment_id, job.job_id)
 
     return _operation_response(None, job)

@@ -31,7 +31,13 @@ class JobService:
         self._handler = handler
         self._timeout_seconds = timeout_seconds
 
-    def submit(self, job_type: str, *, max_attempts: int = 3) -> Job:
+    def submit(
+        self,
+        job_type: str,
+        *,
+        max_attempts: int = 3,
+        enqueue: bool = True,
+    ) -> Job:
         """Create, persist, and enqueue a pending job."""
 
         clean_job_type = job_type.strip()
@@ -46,7 +52,9 @@ class JobService:
         )
 
         self._repository.save(job)
-        self._queue.enqueue(job)
+
+        if enqueue:
+            self._queue.enqueue(job)
 
         return job
 

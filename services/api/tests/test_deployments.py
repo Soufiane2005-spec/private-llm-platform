@@ -19,6 +19,7 @@ from infrastructure.security.jwt_token_service import JWTTokenService
 from interfaces.http.app import create_app
 from interfaces.http.dependencies.auth import get_auth_service
 from interfaces.http.routes.deployments import get_deployment_service
+from interfaces.http.routes.jobs import get_job_service
 
 SECRET_KEY = "deployment-test-secret-long-enough-for-hs256"
 PASSWORD = "correct-password"
@@ -66,6 +67,7 @@ def create_client(role: UserRole = UserRole.ADMIN) -> TestClient:
 
     app = create_app()
     app.dependency_overrides[get_deployment_service] = lambda: deployment_service
+    app.dependency_overrides[get_job_service] = lambda: job_service
     app.dependency_overrides[get_auth_service] = lambda: auth_service
 
     return TestClient(app)
@@ -83,8 +85,8 @@ def auth_headers(client: TestClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
-def test_deploy_ollama_model_creates_completed_job() -> None:
-    """Deploying an Ollama model returns runtime status and job evidence."""
+def test_deploy_ollama_model_creates_async_job() -> None:
+    """Deploying an Ollama model returns immediately and completes in background."""
 
     client = create_client()
 
@@ -98,9 +100,24 @@ def test_deploy_ollama_model_creates_completed_job() -> None:
     body = response.json()
     assert body["deployment"]["model"] == "qwen2.5:1.5b"
     assert body["deployment"]["engine"] == "ollama"
-    assert body["deployment"]["status"] == "running"
-    assert body["deployment"]["runtime_state"] == "local-runtime-ready"
-    assert body["job"]["status"] == "completed"
+    assert body["deployment"]["status"] == "deploying"
+    assert body["deployment"]["runtime_state"] == "deployment-job-submitted"
+    assert body["job"]["status"] == "pending"
+
+    deployment_id = body["deployment"]["deployment_id"]
+    job_id = body["job"]["job_id"]
+
+    final_deployment = client.get(
+        f"/deployments/{deployment_id}",
+        headers=auth_headers(client),
+    )
+    final_job = client.get(f"/jobs/{job_id}")
+
+    assert final_deployment.status_code == 200
+    assert final_deployment.json()["status"] == "running"
+    assert final_deployment.json()["runtime_state"] == "local-runtime-ready"
+    assert final_job.status_code == 200
+    assert final_job.json()["status"] == "completed"
 
 
 def test_deploy_vllm_without_gpu_fails_with_clear_reason() -> None:
@@ -116,11 +133,23 @@ def test_deploy_vllm_without_gpu_fails_with_clear_reason() -> None:
 
     assert response.status_code == 202
     body = response.json()
-    assert body["deployment"]["status"] == "failed"
-    assert body["deployment"]["runtime_state"] == "gpu-unavailable"
-    assert body["deployment"]["gpu_available"] is False
-    assert "requires an NVIDIA GPU" in body["deployment"]["error"]
-    assert body["job"]["status"] == "failed"
+    assert body["deployment"]["status"] == "deploying"
+    assert body["job"]["status"] == "pending"
+
+    deployment_id = body["deployment"]["deployment_id"]
+    job_id = body["job"]["job_id"]
+
+    final_deployment = client.get(
+        f"/deployments/{deployment_id}",
+        headers=auth_headers(client),
+    ).json()
+    final_job = client.get(f"/jobs/{job_id}").json()
+
+    assert final_deployment["status"] == "failed"
+    assert final_deployment["runtime_state"] == "gpu-unavailable"
+    assert final_deployment["gpu_available"] is False
+    assert "requires an NVIDIA GPU" in final_deployment["error"]
+    assert final_job["status"] == "failed"
 
 
 def test_viewer_can_list_but_cannot_deploy() -> None:
@@ -157,14 +186,38 @@ def test_start_stop_restart_and_delete_deployment() -> None:
         f"/deployments/{deployment_id}/stop",
         headers=headers,
     )
+
+    assert stop_response.status_code == 200
+    assert stop_response.json()["job"]["status"] == "pending"
+    assert client.get(
+        f"/deployments/{deployment_id}",
+        headers=headers,
+    ).json()["status"] == "stopped"
+
     start_response = client.post(
         f"/deployments/{deployment_id}/start",
         headers=headers,
     )
+
+    assert start_response.status_code == 200
+    assert start_response.json()["job"]["status"] == "pending"
+    assert client.get(
+        f"/deployments/{deployment_id}",
+        headers=headers,
+    ).json()["status"] == "running"
+
     restart_response = client.post(
         f"/deployments/{deployment_id}/restart",
         headers=headers,
     )
+
+    assert restart_response.status_code == 200
+    assert restart_response.json()["job"]["status"] == "pending"
+    assert client.get(
+        f"/deployments/{deployment_id}",
+        headers=headers,
+    ).json()["status"] == "running"
+
     delete_response = client.delete(
         f"/deployments/{deployment_id}",
         headers=headers,
@@ -174,13 +227,7 @@ def test_start_stop_restart_and_delete_deployment() -> None:
         headers=headers,
     )
 
-    assert stop_response.status_code == 200
-    assert stop_response.json()["deployment"]["status"] == "stopped"
-    assert start_response.status_code == 200
-    assert start_response.json()["deployment"]["status"] == "running"
-    assert restart_response.status_code == 200
-    assert restart_response.json()["deployment"]["status"] == "running"
     assert delete_response.status_code == 200
     assert delete_response.json()["deployment"] is None
-    assert delete_response.json()["job"]["status"] == "completed"
+    assert delete_response.json()["job"]["status"] == "pending"
     assert get_deleted_response.status_code == 404
