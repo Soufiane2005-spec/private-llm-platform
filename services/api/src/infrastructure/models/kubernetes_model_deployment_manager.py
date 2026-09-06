@@ -1,9 +1,12 @@
 """Kubernetes model deployment manager."""
 
+import re
 from datetime import UTC, datetime
 
+from application.services.model_catalog import ModelCatalog, ModelNotFoundError
 from domain.models.deployment import ModelDeployment, ModelDeploymentStatus
 from domain.models.llm_engine import LLMEngine
+from domain.models.model_catalog import ModelCatalogEntry
 
 
 class KubernetesModelDeploymentError(RuntimeError):
@@ -17,6 +20,8 @@ class KubernetesModelDeploymentManager:
         self,
         *,
         namespace: str = "llm-platform",
+        context: str | None = None,
+        model_catalog: ModelCatalog | None = None,
         apps_api: object | None = None,
         core_api: object | None = None,
     ) -> None:
@@ -24,9 +29,11 @@ class KubernetesModelDeploymentManager:
             raise ValueError("namespace cannot be empty.")
 
         self._namespace = namespace
+        self._context = context.strip() if context else None
+        self._model_catalog = model_catalog
 
         if apps_api is None or core_api is None:
-            apps_api, core_api = self._load_kubernetes_clients()
+            apps_api, core_api = self._load_kubernetes_clients(context=self._context)
 
         self._apps_api = apps_api
         self._core_api = core_api
@@ -71,6 +78,7 @@ class KubernetesModelDeploymentManager:
                     "Unable to create Kubernetes model deployment."
                 ) from create_exc
 
+        self._upsert_service(deployment)
         return self._status_from_kubernetes(deployment)
 
     def start(self, deployment: ModelDeployment) -> ModelDeployment:
@@ -130,6 +138,23 @@ class KubernetesModelDeploymentManager:
             raise KubernetesModelDeploymentError(
                 "Unable to delete Kubernetes model deployment."
             ) from exc
+
+        if deployment.engine is LLMEngine.VLLM:
+            try:
+                self._core_api.delete_namespaced_service(
+                    name=self._resource_name(deployment),
+                    namespace=self._namespace,
+                )
+            except Exception as exc:
+                if not self._is_not_found_error(exc):
+                    raise KubernetesModelDeploymentError(
+                        "Unable to delete Kubernetes model service."
+                    ) from exc
+
+    def status(self, deployment: ModelDeployment) -> ModelDeployment:
+        """Return current Kubernetes status for a deployment."""
+
+        return self._status_from_kubernetes(deployment)
 
     def _scale(self, deployment: ModelDeployment, *, replicas: int) -> None:
         try:
@@ -243,24 +268,136 @@ class KubernetesModelDeploymentManager:
                 },
             }
 
+        catalog_entry = self._require_catalog_entry(deployment)
+        context_length = str(catalog_entry.context_length or 1024)
+
         return {
             "name": "vllm",
             "image": "vllm/vllm-openai:v0.27.0",
             "ports": [{"containerPort": 8000}],
+            "env": [
+                {"name": "HF_TOKEN", "value": ""},
+                {"name": "VLLM_LOGGING_LEVEL", "value": "INFO"},
+                {"name": "VLLM_USE_V2_MODEL_RUNNER", "value": "0"},
+                {"name": "VLLM_WSL2_ENABLE_PIN_MEMORY", "value": "1"},
+                {"name": "HF_HOME", "value": "/root/.cache/huggingface"},
+            ],
             "args": [
                 "--model",
-                deployment.model,
+                catalog_entry.engine_model_id,
                 "--served-model-name",
-                deployment.model.split("/")[-1].lower(),
+                catalog_entry.served_model_name,
                 "--dtype",
                 "half",
+                "--max-model-len",
+                context_length,
+                "--max-num-seqs",
+                "1",
+                "--enforce-eager",
             ],
+            "startupProbe": {
+                "httpGet": {"path": "/health", "port": 8000},
+                "periodSeconds": 10,
+                "timeoutSeconds": 5,
+                "failureThreshold": 90,
+            },
+            "readinessProbe": {
+                "httpGet": {"path": "/health", "port": 8000},
+                "periodSeconds": 10,
+                "timeoutSeconds": 5,
+                "failureThreshold": 6,
+            },
+            "livenessProbe": {
+                "httpGet": {"path": "/health", "port": 8000},
+                "periodSeconds": 30,
+                "timeoutSeconds": 5,
+                "failureThreshold": 3,
+            },
             "securityContext": self._container_security_context(),
             "resources": {
                 "requests": {"cpu": "1", "memory": "2Gi", "nvidia.com/gpu": "1"},
                 "limits": {"cpu": "6", "memory": "8Gi", "nvidia.com/gpu": "1"},
             },
         }
+
+    def _upsert_service(self, deployment: ModelDeployment) -> None:
+        name = self._resource_name(deployment)
+        body = {
+            "apiVersion": "v1",
+            "kind": "Service",
+            "metadata": {
+                "name": name,
+                "namespace": self._namespace,
+                "labels": {
+                    "app": name,
+                    "managed-by": "private-llm-platform",
+                },
+            },
+            "spec": {
+                "selector": {"app": name},
+                "ports": [
+                    {
+                        "port": 8000,
+                        "targetPort": 8000,
+                        "protocol": "TCP",
+                    }
+                ],
+            },
+        }
+
+        try:
+            self._core_api.patch_namespaced_service(
+                name=name,
+                namespace=self._namespace,
+                body=body,
+            )
+        except Exception as exc:
+            if not self._is_not_found_error(exc):
+                raise KubernetesModelDeploymentError(
+                    "Unable to update Kubernetes model service."
+                ) from exc
+
+            try:
+                self._core_api.create_namespaced_service(
+                    namespace=self._namespace,
+                    body=body,
+                )
+            except Exception as create_exc:
+                raise KubernetesModelDeploymentError(
+                    "Unable to create Kubernetes model service."
+                ) from create_exc
+
+    def _require_catalog_entry(self, deployment: ModelDeployment) -> ModelCatalogEntry:
+        if self._model_catalog is None:
+            served_name = deployment.model.split("/")[-1].lower()
+            return ModelCatalogEntry(
+                model_id=self._slugify(served_name),
+                display_name=served_name,
+                engine=deployment.engine,
+                engine_model_id=deployment.model,
+                context_length=1024,
+                served_model_name=served_name,
+                gpu_required=True,
+            )
+
+        for entry in self._model_catalog.list_models():
+            if entry.engine is not deployment.engine:
+                continue
+
+            identifiers = {
+                entry.model_id,
+                entry.engine_model_id,
+                entry.benchmark_model_id,
+            }
+            if deployment.model in identifiers:
+                return entry
+
+        try:
+            return self._model_catalog.get(deployment.model)
+        except ModelNotFoundError as exc:
+            raise KubernetesModelDeploymentError(
+                f"Model '{deployment.model}' was not found in the catalog."
+            ) from exc
 
     @staticmethod
     def _container_security_context() -> dict:
@@ -278,21 +415,22 @@ class KubernetesModelDeploymentManager:
         if deployment.engine is LLMEngine.OLLAMA:
             return "ollama"
 
-        clean_model = (
-            deployment.model.lower()
-            .replace("/", "-")
-            .replace(":", "-")
-            .replace("_", "-")
-            .replace(".", "-")
-        )
+        clean_model = KubernetesModelDeploymentManager._slugify(deployment.model)
         return f"model-{deployment.engine.value}-{clean_model}"[:63].rstrip("-")
+
+    @staticmethod
+    def _slugify(value: str) -> str:
+        return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
 
     @staticmethod
     def _is_not_found_error(exc: Exception) -> bool:
         return getattr(exc, "status", None) == 404
 
     @staticmethod
-    def _load_kubernetes_clients() -> tuple[object, object]:
+    def _load_kubernetes_clients(
+        *,
+        context: str | None = None,
+    ) -> tuple[object, object]:
         try:
             from kubernetes import client, config
         except ImportError as exc:
@@ -303,6 +441,6 @@ class KubernetesModelDeploymentManager:
         try:
             config.load_incluster_config()
         except Exception:
-            config.load_kube_config()
+            config.load_kube_config(context=context)
 
         return client.AppsV1Api(), client.CoreV1Api()

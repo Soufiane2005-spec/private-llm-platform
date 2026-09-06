@@ -51,14 +51,17 @@ spec:
             - name: VLLM_USE_V2_MODEL_RUNNER
               value: "0"
 
+            - name: VLLM_WSL2_ENABLE_PIN_MEMORY
+              value: "1"
+
             - name: HF_HOME
               value: /root/.cache/huggingface
 
           args:
             - --model
-            - Qwen/Qwen3-0.6B
+            - HuggingFaceTB/SmolLM2-135M-Instruct
             - --served-model-name
-            - qwen3-0.6b
+            - smollm2-135m
             - --dtype
             - half
             - --gpu-memory-utilization

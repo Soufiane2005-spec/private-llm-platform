@@ -218,6 +218,17 @@ def test_start_stop_restart_and_delete_deployment() -> None:
         headers=headers,
     ).json()["status"] == "running"
 
+    blocked_delete_response = client.delete(
+        f"/deployments/{deployment_id}",
+        headers=headers,
+    )
+    assert blocked_delete_response.status_code == 409
+
+    client.post(
+        f"/deployments/{deployment_id}/stop",
+        headers=headers,
+    )
+
     delete_response = client.delete(
         f"/deployments/{deployment_id}",
         headers=headers,

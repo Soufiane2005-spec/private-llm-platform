@@ -51,5 +51,10 @@ class LocalModelDeploymentManager:
         stopped = self.stop(deployment)
         return self.start(stopped)
 
+    def status(self, deployment: ModelDeployment) -> ModelDeployment:
+        """Return the stored local runtime status."""
+
+        return deployment
+
     def delete(self, deployment: ModelDeployment) -> None:
         """No-op for local deployments."""

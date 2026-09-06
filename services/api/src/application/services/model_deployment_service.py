@@ -9,6 +9,7 @@ from application.ports.job_repository import JobRepository
 from application.ports.model_deployment_manager import ModelDeploymentManager
 from application.ports.model_deployment_repository import ModelDeploymentRepository
 from application.services.job_service import JobService
+from application.services.model_catalog import ModelCatalog, ModelNotFoundError
 from domain.jobs.job import Job
 from domain.models.deployment import ModelDeployment, ModelDeploymentStatus
 from domain.models.llm_engine import LLMEngine
@@ -28,6 +29,7 @@ class ModelDeploymentService:
         manager: ModelDeploymentManager,
         jobs: JobService,
         job_repository: JobRepository,
+        model_catalog: ModelCatalog | None = None,
         timeout_seconds: float = 120.0,
     ) -> None:
         if timeout_seconds <= 0:
@@ -37,24 +39,29 @@ class ModelDeploymentService:
         self._manager = manager
         self._jobs = jobs
         self._job_repository = job_repository
+        self._model_catalog = model_catalog
         self._timeout_seconds = timeout_seconds
 
     def list_deployments(self) -> tuple[ModelDeployment, ...]:
         """Return all tracked deployments."""
 
-        return self._deployments.list()
+        return tuple(self._refresh_status(deployment) for deployment in self._deployments.list())
 
     def get_deployment(self, deployment_id: str) -> ModelDeployment | None:
         """Return one deployment by identifier."""
 
-        return self._deployments.get(deployment_id)
+        deployment = self._deployments.get(deployment_id)
+        if deployment is None:
+            return None
+        return self._refresh_status(deployment)
 
     def deploy(self, model: str, engine: LLMEngine) -> tuple[ModelDeployment, Job]:
         """Create a deployment and submit its asynchronous deployment job."""
 
+        catalog_entry = self._catalog_entry_for(model, engine)
         deployment = ModelDeployment(
             deployment_id=str(uuid4()),
-            model=model.strip(),
+            model=catalog_entry.model_id if catalog_entry is not None else model.strip(),
             engine=engine,
             status=ModelDeploymentStatus.DEPLOYING,
             runtime_state="deployment-job-submitted",
@@ -114,7 +121,14 @@ class ModelDeploymentService:
     def delete(self, deployment_id: str) -> Job:
         """Submit an asynchronous deployment delete job."""
 
-        self._require_deployment(deployment_id)
+        deployment = self._require_deployment(deployment_id)
+        if deployment.status not in {
+            ModelDeploymentStatus.FAILED,
+            ModelDeploymentStatus.STOPPED,
+        }:
+            raise ValueError(
+                "Only failed or stopped deployments can be deleted. Stop it first."
+            )
         return self._submit_operation_job(f"delete-model:{deployment_id}")
 
     def execute_deploy(self, deployment_id: str, job_id: str) -> Job:
@@ -216,6 +230,47 @@ class ModelDeploymentService:
             raise KeyError("Deployment not found.")
 
         return deployment
+
+    def _refresh_status(self, deployment: ModelDeployment) -> ModelDeployment:
+        if deployment.runtime_state in {
+            "deployment-job-submitted",
+            "start-job-submitted",
+            "stop-job-submitted",
+            "restart-job-submitted",
+        }:
+            return deployment
+
+        try:
+            refreshed = self._manager.status(deployment)
+        except Exception:
+            return deployment
+
+        if refreshed != deployment:
+            self._deployments.save(refreshed)
+
+        return refreshed
+
+    def _catalog_entry_for(self, model: str, engine: LLMEngine):
+        if self._model_catalog is None:
+            return None
+
+        stripped = model.strip()
+        for entry in self._model_catalog.list_models():
+            if entry.engine is not engine:
+                continue
+
+            identifiers = {
+                entry.model_id,
+                entry.engine_model_id,
+                entry.benchmark_model_id,
+            }
+            if stripped in identifiers:
+                return entry
+
+        try:
+            return self._model_catalog.get(stripped)
+        except ModelNotFoundError:
+            return None
 
     def _require_job(self, job_id: str) -> Job:
         job = self._job_repository.get(job_id)
