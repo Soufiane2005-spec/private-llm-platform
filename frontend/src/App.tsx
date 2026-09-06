@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+} from 'react'
 
 import './App.css'
 
@@ -10,6 +16,7 @@ import {
   runBenchmark,
 } from './api/benchmarks'
 import {
+  deleteDeployment,
   deployModel,
   fetchDeployments,
   runDeploymentAction,
@@ -20,7 +27,12 @@ import {
   fetchJobRuntime,
   runNextJob,
 } from './api/job'
-import { fetchModels } from './api/models'
+import {
+  createModel,
+  deleteModel,
+  fetchModels,
+  updateModel,
+} from './api/models'
 import { fetchMonitoringDashboard } from './api/monitoring'
 import {
   createUser,
@@ -35,7 +47,7 @@ import type {
   BenchmarkReport,
 } from './types/benchmark'
 import type { Job, JobRuntime, JobStatus } from './types/job'
-import type { ModelCatalogEntry } from './types/model'
+import type { LLMEngine, ModelCatalogEntry, ModelCreatePayload } from './types/model'
 import type { MonitoringDashboard } from './types/monitoring'
 import type { ModelDeployment } from './types/deployment'
 import type { PlatformUser } from './types/user'
@@ -81,6 +93,7 @@ function App() {
   const [models, setModels] = useState<ModelCatalogEntry[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
   const [modelsError, setModelsError] = useState<string | null>(null)
+  const [modelAction, setModelAction] = useState<string | null>(null)
   const [deployments, setDeployments] = useState<ModelDeployment[]>([])
   const [deploymentsLoading, setDeploymentsLoading] = useState(false)
   const [deploymentsError, setDeploymentsError] = useState<string | null>(null)
@@ -111,22 +124,30 @@ function App() {
   const [monitoringLoading, setMonitoringLoading] = useState(true)
   const [monitoringError, setMonitoringError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function loadModels() {
-      try {
-        const data = await fetchModels()
-        setModels(data)
-      } catch (err) {
-        setModelsError(
-          err instanceof Error ? err.message : 'Unable to load models.',
-        )
-      } finally {
-        setModelsLoading(false)
-      }
-    }
+  const loadModels = useCallback(async () => {
+    await Promise.resolve()
+    setModelsLoading(true)
+    setModelsError(null)
 
-    void loadModels()
+    try {
+      const data = await fetchModels()
+      setModels(data)
+    } catch (err) {
+      setModelsError(
+        err instanceof Error ? err.message : 'Unable to load models.',
+      )
+    } finally {
+      setModelsLoading(false)
+    }
   }, [])
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      void loadModels()
+    }, 0)
+
+    return () => window.clearTimeout(timeout)
+  }, [loadModels])
 
   async function refreshBenchmarks() {
     try {
@@ -394,8 +415,9 @@ function App() {
     setDeploymentsError(null)
 
     try {
-      await deployModel(token, model.engine_model_id, model.engine)
+      await deployModel(token, model.model_id, model.engine)
       await loadDeployments(token)
+      await loadModels()
       await refreshJobs()
     } catch (err) {
       setDeploymentsError(
@@ -406,9 +428,76 @@ function App() {
     }
   }
 
+  async function handleCreateModel(payload: ModelCreatePayload) {
+    if (!token) {
+      setModelsError('Login required.')
+      return
+    }
+
+    setModelAction('create')
+    setModelsError(null)
+
+    try {
+      await createModel(token, payload)
+      await loadModels()
+    } catch (err) {
+      setModelsError(
+        err instanceof Error ? err.message : 'Unable to create model.',
+      )
+      throw err
+    } finally {
+      setModelAction(null)
+    }
+  }
+
+  async function handleUpdateModel(
+    modelId: string,
+    payload: Partial<ModelCreatePayload>,
+  ) {
+    if (!token) {
+      setModelsError('Login required.')
+      return
+    }
+
+    setModelAction(`update-${modelId}`)
+    setModelsError(null)
+
+    try {
+      await updateModel(token, modelId, payload)
+      await loadModels()
+    } catch (err) {
+      setModelsError(
+        err instanceof Error ? err.message : 'Unable to update model.',
+      )
+    } finally {
+      setModelAction(null)
+    }
+  }
+
+  async function handleDeleteModel(modelId: string) {
+    if (!token) {
+      setModelsError('Login required.')
+      return
+    }
+
+    setModelAction(`delete-${modelId}`)
+    setModelsError(null)
+
+    try {
+      await deleteModel(token, modelId)
+      await loadModels()
+    } catch (err) {
+      setModelsError(
+        err instanceof Error ? err.message : 'Unable to delete model.',
+      )
+    } finally {
+      setModelAction(null)
+    }
+  }
+
   async function handleDeploymentAction(
     deploymentId: string,
-    action: 'start' | 'stop' | 'restart',
+    action: 'start' | 'stop' | 'restart' | 'delete',
   ) {
     if (!token) {
       setDeploymentsError('Login required.')
@@ -419,8 +508,13 @@ function App() {
     setDeploymentsError(null)
 
     try {
-      await runDeploymentAction(token, deploymentId, action)
+      if (action === 'delete') {
+        await deleteDeployment(token, deploymentId)
+      } else {
+        await runDeploymentAction(token, deploymentId, action)
+      }
       await loadDeployments(token)
+      await loadModels()
       await refreshJobs()
     } catch (err) {
       setDeploymentsError(
@@ -602,8 +696,12 @@ function App() {
           deploymentsError={deploymentsError}
           user={currentUser}
           action={deploymentAction}
+          modelAction={modelAction}
           onDeploy={handleDeploy}
           onDeploymentAction={handleDeploymentAction}
+          onCreateModel={handleCreateModel}
+          onUpdateModel={handleUpdateModel}
+          onDeleteModel={handleDeleteModel}
         />
       )}
 
@@ -691,11 +789,18 @@ interface ModelsViewProps {
   deploymentsError: string | null
   user: CurrentUser | null
   action: string | null
+  modelAction: string | null
   onDeploy: (model: ModelCatalogEntry) => void
   onDeploymentAction: (
     deploymentId: string,
-    action: 'start' | 'stop' | 'restart',
+    action: 'start' | 'stop' | 'restart' | 'delete',
   ) => void
+  onCreateModel: (payload: ModelCreatePayload) => Promise<void>
+  onUpdateModel: (
+    modelId: string,
+    payload: Partial<ModelCreatePayload>,
+  ) => Promise<void>
+  onDeleteModel: (modelId: string) => Promise<void>
 }
 
 function ModelsView({
@@ -708,10 +813,23 @@ function ModelsView({
   deploymentsError,
   user,
   action,
+  modelAction,
   onDeploy,
   onDeploymentAction,
+  onCreateModel,
+  onUpdateModel,
+  onDeleteModel,
 }: ModelsViewProps) {
   const canOperate = user?.role === 'admin' || user?.role === 'engineer'
+  const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null)
+  const [editingModel, setEditingModel] = useState<ModelCatalogEntry | null>(
+    null,
+  )
+
+  function closeModal() {
+    setModalMode(null)
+    setEditingModel(null)
+  }
 
   return (
     <>
@@ -736,7 +854,18 @@ function ModelsView({
           </div>
 
           {!loading && !error && (
-            <span className="status">{enabledModels} enabled</span>
+            <div className="section-actions">
+              <span className="status">{enabledModels} enabled</span>
+              {canOperate && (
+                <button
+                  type="button"
+                  className="action-button"
+                  onClick={() => setModalMode('create')}
+                >
+                  + Add Model
+                </button>
+              )}
+            </div>
           )}
         </div>
 
@@ -784,6 +913,13 @@ function ModelsView({
                     <dd>{model.engine_model_id}</dd>
                   </div>
 
+                  {model.served_model_name && (
+                    <div>
+                      <dt>Served model</dt>
+                      <dd>{model.served_model_name}</dd>
+                    </div>
+                  )}
+
                   <div>
                     <dt>Context length</dt>
                     <dd>
@@ -792,25 +928,88 @@ function ModelsView({
                         : 'Not specified'}
                     </dd>
                   </div>
+
+                  <div>
+                    <dt>Runtime</dt>
+                    <dd>
+                      {model.runtime_available
+                        ? 'Available'
+                        : 'Not available'}
+                    </dd>
+                  </div>
                 </dl>
 
                 {canOperate && (
-                  <button
-                    type="button"
-                    className="action-button"
-                    disabled={action === `deploy-${model.model_id}`}
-                    onClick={() => onDeploy(model)}
-                  >
-                    {action === `deploy-${model.model_id}`
-                      ? 'Deploying'
-                      : 'Deploy'}
-                  </button>
+                  <div className="model-actions">
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      disabled={modelAction === `update-${model.model_id}`}
+                      onClick={() => {
+                        void onUpdateModel(model.model_id, {
+                          enabled: !model.enabled,
+                        })
+                      }}
+                    >
+                      {model.enabled ? 'Disable' : 'Enable'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => {
+                        setEditingModel(model)
+                        setModalMode('edit')
+                      }}
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      disabled={modelAction === `delete-${model.model_id}`}
+                      onClick={() => {
+                        void onDeleteModel(model.model_id)
+                      }}
+                    >
+                      Delete
+                    </button>
+
+                    <button
+                      type="button"
+                      className="action-button"
+                      disabled={action === `deploy-${model.model_id}`}
+                      onClick={() => onDeploy(model)}
+                    >
+                      {action === `deploy-${model.model_id}`
+                        ? 'Deploying'
+                        : 'Deploy'}
+                    </button>
+                  </div>
                 )}
               </article>
             ))}
           </div>
         )}
       </section>
+
+      {modalMode && (
+        <ModelModal
+          mode={modalMode}
+          model={editingModel}
+          saving={modelAction === 'create'}
+          onClose={closeModal}
+          onCreate={async (payload) => {
+            await onCreateModel(payload)
+            closeModal()
+          }}
+          onUpdate={async (modelId, payload) => {
+            await onUpdateModel(modelId, payload)
+            closeModal()
+          }}
+        />
+      )}
 
       <section className="content">
         <div className="section-heading">
@@ -873,6 +1072,228 @@ function ModelsView({
   )
 }
 
+function ModelModal({
+  mode,
+  model,
+  saving,
+  onClose,
+  onCreate,
+  onUpdate,
+}: {
+  mode: 'create' | 'edit'
+  model: ModelCatalogEntry | null
+  saving: boolean
+  onClose: () => void
+  onCreate: (payload: ModelCreatePayload) => Promise<void>
+  onUpdate: (
+    modelId: string,
+    payload: Partial<ModelCreatePayload>,
+  ) => Promise<void>
+}) {
+  const [displayName, setDisplayName] = useState(model?.display_name ?? '')
+  const [engine, setEngine] = useState<LLMEngine>(model?.engine ?? 'vllm')
+  const [engineModelId, setEngineModelId] = useState(
+    model?.engine_model_id ?? '',
+  )
+  const [servedModelName, setServedModelName] = useState(
+    model?.served_model_name ?? '',
+  )
+  const [contextLength, setContextLength] = useState(
+    model?.context_length ? String(model.context_length) : '',
+  )
+  const [enabled, setEnabled] = useState(model?.enabled ?? true)
+  const [gpuRequired, setGpuRequired] = useState(
+    model?.gpu_required ?? engine === 'vllm',
+  )
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setError(null)
+
+    if (!displayName.trim()) {
+      setError('Display name is required.')
+      return
+    }
+
+    if (!engineModelId.trim()) {
+      setError(
+        engine === 'vllm'
+          ? 'HuggingFace/source model ID is required.'
+          : 'Ollama model ID is required.',
+      )
+      return
+    }
+
+    if (engine === 'vllm' && !servedModelName.trim()) {
+      setError('Served model name is required for vLLM.')
+      return
+    }
+
+    const parsedContextLength =
+      contextLength.trim() === '' ? null : Number(contextLength)
+
+    if (
+      parsedContextLength !== null &&
+      (!Number.isInteger(parsedContextLength) || parsedContextLength <= 0)
+    ) {
+      setError('Context length must be a positive integer.')
+      return
+    }
+
+    const payload: ModelCreatePayload = {
+      display_name: displayName.trim(),
+      engine,
+      engine_model_id: engineModelId.trim(),
+      context_length: parsedContextLength,
+      enabled,
+      served_model_name:
+        engine === 'vllm' ? servedModelName.trim() : null,
+      gpu_required: engine === 'vllm' ? true : gpuRequired,
+    }
+
+    try {
+      if (mode === 'edit' && model) {
+        await onUpdate(model.model_id, payload)
+      } else {
+        await onCreate(payload)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to save model.')
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" role="presentation">
+      <section
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="model-modal-title"
+      >
+        <div className="modal-header">
+          <div>
+            <p className="eyebrow">Catalog entry</p>
+            <h2 id="model-modal-title">
+              {mode === 'edit' ? 'Edit Model' : 'Add Model'}
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            className="icon-button"
+            aria-label="Close modal"
+            onClick={onClose}
+          >
+            x
+          </button>
+        </div>
+
+        <form className="model-form" onSubmit={handleSubmit}>
+          <label>
+            Display name
+            <input
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+            />
+          </label>
+
+          <label>
+            Engine
+            <select
+              value={engine}
+              disabled={mode === 'edit'}
+              onChange={(event) => {
+                const nextEngine = event.target.value as LLMEngine
+                setEngine(nextEngine)
+                setGpuRequired(nextEngine === 'vllm')
+              }}
+            >
+              <option value="ollama">Ollama</option>
+              <option value="vllm">vLLM</option>
+            </select>
+          </label>
+
+          <label>
+            {engine === 'vllm'
+              ? 'HuggingFace/source model ID'
+              : 'Ollama model ID'}
+            <input
+              placeholder={
+                engine === 'vllm'
+                  ? 'HuggingFaceTB/SmolLM2-135M-Instruct'
+                  : 'llama3.2:3b'
+              }
+              value={engineModelId}
+              onChange={(event) => setEngineModelId(event.target.value)}
+            />
+          </label>
+
+          {engine === 'vllm' && (
+            <label>
+              Served model name
+              <input
+                placeholder="smollm2-135m"
+                value={servedModelName}
+                onChange={(event) =>
+                  setServedModelName(event.target.value)
+                }
+              />
+            </label>
+          )}
+
+          <label>
+            Context length
+            <input
+              inputMode="numeric"
+              placeholder="1024"
+              value={contextLength}
+              onChange={(event) => setContextLength(event.target.value)}
+            />
+          </label>
+
+          <div className="form-toggles">
+            <label>
+              <input
+                type="checkbox"
+                checked={enabled}
+                onChange={(event) => setEnabled(event.target.checked)}
+              />
+              Enabled
+            </label>
+
+            <label>
+              <input
+                type="checkbox"
+                checked={gpuRequired}
+                disabled={engine === 'vllm'}
+                onChange={(event) => setGpuRequired(event.target.checked)}
+              />
+              GPU required
+            </label>
+          </div>
+
+          {error && <p className="form-note form-note-error">{error}</p>}
+
+          <div className="modal-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={onClose}
+            >
+              Cancel
+            </button>
+
+            <button type="submit" className="action-button" disabled={saving}>
+              {saving ? 'Saving' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  )
+}
+
 function DeploymentCard({
   deployment,
   canOperate,
@@ -884,9 +1305,12 @@ function DeploymentCard({
   action: string | null
   onAction: (
     deploymentId: string,
-    action: 'start' | 'stop' | 'restart',
+    action: 'start' | 'stop' | 'restart' | 'delete',
   ) => void
 }) {
+  const canDelete =
+    deployment.status === 'failed' || deployment.status === 'stopped'
+
   return (
     <article className="model-card">
       <div className="model-card-header">
@@ -952,6 +1376,18 @@ function DeploymentCard({
                 : formatRuntimeStatus(operation)}
             </button>
           ))}
+          {canDelete && (
+            <button
+              type="button"
+              className="action-button action-button-danger"
+              disabled={action === `delete-${deployment.deployment_id}`}
+              onClick={() => onAction(deployment.deployment_id, 'delete')}
+            >
+              {action === `delete-${deployment.deployment_id}`
+                ? 'Deleting'
+                : 'Delete'}
+            </button>
+          )}
         </div>
       )}
     </article>
@@ -1359,9 +1795,11 @@ function BenchmarksView({
     'Explain the difference between Ollama and vLLM in two sentences.',
   )
   const canRun = user?.role === 'admin' || user?.role === 'engineer'
-  const enabledModels = models.filter((model) => model.enabled)
+  const enabledModels = models.filter(
+    (model) => model.enabled && model.runtime_available,
+  )
   const selectedCatalogModel =
-    enabledModels.find((model) => model.engine_model_id === selectedModel) ??
+    enabledModels.find((model) => model.model_id === selectedModel) ??
     enabledModels[0]
 
   const latencyData: ChartDatum[] = visibleBenchmarks.map(
@@ -1420,7 +1858,7 @@ function BenchmarksView({
             }
 
             onRun(
-              selectedCatalogModel.engine_model_id,
+              selectedCatalogModel.model_id,
               selectedCatalogModel.engine,
               promptText
                 .split('\n')
@@ -1822,7 +2260,7 @@ function BenchmarkRunForm({
           onChange={(event) => onModelChange(event.target.value)}
         >
           {models.map((model) => (
-            <option key={model.model_id} value={model.engine_model_id}>
+            <option key={model.model_id} value={model.model_id}>
               {model.display_name} ({model.engine})
             </option>
           ))}
@@ -1847,6 +2285,12 @@ function BenchmarkRunForm({
       {!canRun && (
         <p className="form-note">
           Login as admin or engineer to run benchmarks.
+        </p>
+      )}
+
+      {canRun && models.length === 0 && (
+        <p className="form-note">
+          No enabled model is currently available in its runtime.
         </p>
       )}
 
