@@ -2,10 +2,15 @@
 
 from types import SimpleNamespace
 
+from application.services.model_catalog import ModelCatalog
 from domain.models.deployment import ModelDeployment, ModelDeploymentStatus
 from domain.models.llm_engine import LLMEngine
+from domain.models.model_catalog import ModelCatalogEntry
 from infrastructure.models.kubernetes_model_deployment_manager import (
     KubernetesModelDeploymentManager,
+)
+from infrastructure.persistence.in_memory_model_catalog_repository import (
+    InMemoryModelCatalogRepository,
 )
 
 
@@ -78,6 +83,9 @@ class FakeCoreApi:
 
     def __init__(self, gpu: str | None = None) -> None:
         self.gpu = gpu
+        self.created_services: list[dict] = []
+        self.patched_services: list[dict] = []
+        self.deleted_services: list[str] = []
 
     def list_node(self) -> SimpleNamespace:
         allocatable = {}
@@ -93,11 +101,38 @@ class FakeCoreApi:
             ]
         )
 
+    def patch_namespaced_service(self, *, name: str, namespace: str, body: dict) -> None:
+        self.patched_services.append({"name": name, "namespace": namespace, "body": body})
+
+    def create_namespaced_service(self, *, namespace: str, body: dict) -> None:
+        self.created_services.append({"namespace": namespace, "body": body})
+
+    def delete_namespaced_service(self, *, name: str, namespace: str) -> None:
+        self.deleted_services.append(f"{namespace}/{name}")
+
+
+def model_catalog() -> ModelCatalog:
+    """Return a catalog containing the dynamic vLLM test model."""
+
+    repository = InMemoryModelCatalogRepository()
+    repository.save(
+        ModelCatalogEntry(
+            model_id="smollm2-360m",
+            display_name="SmolLM2 360M",
+            engine=LLMEngine.VLLM,
+            engine_model_id="HuggingFaceTB/SmolLM2-360M-Instruct",
+            served_model_name="smollm2-360m",
+            context_length=1024,
+            gpu_required=True,
+        )
+    )
+    return ModelCatalog(repository=repository)
+
 
 def deployment(engine: LLMEngine = LLMEngine.OLLAMA) -> ModelDeployment:
     """Return a valid deployment fixture."""
 
-    model = "qwen2.5:1.5b" if engine is LLMEngine.OLLAMA else "Qwen/Qwen3-0.6B"
+    model = "qwen2.5:1.5b" if engine is LLMEngine.OLLAMA else "smollm2-360m"
     return ModelDeployment(
         deployment_id="deployment-1",
         model=model,
@@ -155,6 +190,7 @@ def test_deploy_vllm_with_gpu_requests_gpu_resources() -> None:
     manager = KubernetesModelDeploymentManager(
         apps_api=apps_api,
         core_api=FakeCoreApi(gpu="1"),
+        model_catalog=model_catalog(),
     )
 
     result = manager.deploy(deployment(LLMEngine.VLLM))
@@ -162,6 +198,15 @@ def test_deploy_vllm_with_gpu_requests_gpu_resources() -> None:
     container = apps_api.patches[0]["body"]["spec"]["template"]["spec"]["containers"][0]
     assert container["resources"]["requests"]["nvidia.com/gpu"] == "1"
     assert container["resources"]["limits"]["nvidia.com/gpu"] == "1"
+    assert container["args"][:4] == [
+        "--model",
+        "HuggingFaceTB/SmolLM2-360M-Instruct",
+        "--served-model-name",
+        "smollm2-360m",
+    ]
+    assert {"name": "VLLM_USE_V2_MODEL_RUNNER", "value": "0"} in container["env"]
+    assert {"name": "VLLM_WSL2_ENABLE_PIN_MEMORY", "value": "1"} in container["env"]
+    assert apps_api.patches[0]["name"] == "model-vllm-smollm2-360m"
     assert result.status is ModelDeploymentStatus.LOADING
     assert result.runtime_state == "ready:0/1"
     assert result.gpu_available is True

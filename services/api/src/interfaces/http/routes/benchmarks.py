@@ -7,14 +7,17 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from application.services.benchmark_execution_service import BenchmarkExecutionService
 from application.services.benchmark_query_service import BenchmarkQueryService
 from application.services.job_service import JobService
+from application.services.model_catalog import ModelCatalog
 from domain.benchmarks.benchmark_record import BenchmarkRecord
 from domain.jobs.job import Job
 from infrastructure.config import get_settings
 from infrastructure.llm.ollama_benchmark_executor import OllamaBenchmarkExecutor
+from infrastructure.llm.vllm_benchmark_executor import VLLMBenchmarkExecutor
 from infrastructure.monitoring.resource_provider import SystemResourceProvider
 from infrastructure.persistence.factory import (
     get_persistent_benchmark_repository,
     get_persistent_job_repository,
+    get_persistent_model_catalog_repository,
 )
 from infrastructure.queue.in_memory_job_queue import InMemoryJobQueue
 from interfaces.http.dependencies.auth import EngineerUserDependency
@@ -40,9 +43,14 @@ _execution_service = BenchmarkExecutionService(
     repository=_repository,
     jobs=_job_service,
     job_repository=_job_repository,
+    model_catalog=ModelCatalog(repository=get_persistent_model_catalog_repository()),
     ollama_executor=OllamaBenchmarkExecutor(
         base_url=get_settings().ollama_base_url,
         timeout_seconds=get_settings().ollama_timeout_seconds,
+    ),
+    vllm_executor=VLLMBenchmarkExecutor(
+        base_url=get_settings().vllm_base_url,
+        timeout_seconds=get_settings().vllm_timeout_seconds,
     ),
     resource_sampler=SystemResourceProvider(),
 )

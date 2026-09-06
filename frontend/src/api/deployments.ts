@@ -15,7 +15,7 @@ function authHeaders(token: string) {
 
 async function parseOperation(response: Response): Promise<DeploymentOperation> {
   if (!response.ok) {
-    throw new Error(`Deployment operation failed: ${response.status}`)
+    throw new Error(await errorMessage(response, 'Deployment operation failed'))
   }
 
   return response.json() as Promise<DeploymentOperation>
@@ -66,4 +66,32 @@ export async function runDeploymentAction(
   )
 
   return parseOperation(response)
+}
+
+export async function deleteDeployment(
+  token: string,
+  deploymentId: string,
+): Promise<DeploymentOperation> {
+  const response = await fetch(`${API_BASE_URL}/deployments/${deploymentId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  })
+
+  return parseOperation(response)
+}
+
+async function errorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  try {
+    const body = (await response.json()) as { detail?: string }
+    if (body.detail) {
+      return body.detail
+    }
+  } catch {
+    // Keep the fallback when the API does not return a JSON error body.
+  }
+
+  return `${fallback}: ${response.status}`
 }

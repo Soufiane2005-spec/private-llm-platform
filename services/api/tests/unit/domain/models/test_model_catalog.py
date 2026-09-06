@@ -32,10 +32,11 @@ def test_reject_empty_required_fields(
     value: str,
 ) -> None:
     values = {
-        "model_id": "qwen3-0.6b",
-        "display_name": "Qwen3 0.6B",
+        "model_id": "smollm2-135m",
+        "display_name": "SmolLM2 135M",
         "engine": LLMEngine.VLLM,
-        "engine_model_id": "Qwen/Qwen3-0.6B",
+        "engine_model_id": "HuggingFaceTB/SmolLM2-135M-Instruct",
+        "served_model_name": "smollm2-135m",
     }
     values[field] = value
 
@@ -49,9 +50,10 @@ def test_reject_invalid_context_length() -> None:
         match="context_length must be greater than zero",
     ):
         ModelCatalogEntry(
-            model_id="qwen3-0.6b",
-            display_name="Qwen3 0.6B",
+            model_id="smollm2-135m",
+            display_name="SmolLM2 135M",
             engine=LLMEngine.VLLM,
-            engine_model_id="Qwen/Qwen3-0.6B",
+            engine_model_id="HuggingFaceTB/SmolLM2-135M-Instruct",
             context_length=0,
+            served_model_name="smollm2-135m",
         )

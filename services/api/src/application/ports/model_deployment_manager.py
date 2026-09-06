@@ -22,3 +22,6 @@ class ModelDeploymentManager(Protocol):
 
     def delete(self, deployment: ModelDeployment) -> None:
         """Remove runtime resources for a deployment."""
+
+    def status(self, deployment: ModelDeployment) -> ModelDeployment:
+        """Return current runtime status for a deployment."""

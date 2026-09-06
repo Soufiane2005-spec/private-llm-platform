@@ -9,6 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from domain.auth.user import UserRole
 
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+PROJECT_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 DEFAULT_CORS_ALLOWED_ORIGINS = (
     "http://localhost:5173",
     "http://localhost:5174",
@@ -52,10 +53,13 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_timeout_seconds: float = 120.0
+    vllm_base_url: str = "http://127.0.0.1:8000"
+    vllm_timeout_seconds: float = 120.0
     cors_allowed_origins: str = ",".join(DEFAULT_CORS_ALLOWED_ORIGINS)
     database_url: str = "sqlite:///./data/platform.db"
     prometheus_base_url: str | None = None
     model_deployment_backend: str = "local"
+    kubernetes_context: str | None = None
     kubernetes_namespace: str = "llm-platform"
     model_operation_timeout_seconds: float = 120.0
 
@@ -86,7 +90,7 @@ class Settings(BaseSettings):
         return ENV_FILE.parent / configured_path
 
     model_config = SettingsConfigDict(
-        env_file=ENV_FILE,
+        env_file=(PROJECT_ENV_FILE, ENV_FILE),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",

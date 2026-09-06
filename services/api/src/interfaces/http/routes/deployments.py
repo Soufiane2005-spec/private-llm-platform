@@ -5,6 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from application.services.job_service import JobService
+from application.services.model_catalog import ModelCatalog
 from application.services.model_deployment_service import ModelDeploymentService
 from domain.jobs.job import Job
 from domain.models.deployment import ModelDeployment
@@ -18,6 +19,7 @@ from infrastructure.models.local_model_deployment_manager import (
 from infrastructure.persistence.factory import (
     get_persistent_deployment_repository,
     get_persistent_job_repository,
+    get_persistent_model_catalog_repository,
 )
 from infrastructure.queue.in_memory_job_queue import InMemoryJobQueue
 from interfaces.http.dependencies.auth import EngineerUserDependency, ViewerUserDependency
@@ -38,12 +40,19 @@ _settings = get_settings()
 _deployment_service = ModelDeploymentService(
     deployments=_deployment_repository,
     manager=(
-        KubernetesModelDeploymentManager(namespace=_settings.kubernetes_namespace)
+        KubernetesModelDeploymentManager(
+            namespace=_settings.kubernetes_namespace,
+            context=_settings.kubernetes_context,
+            model_catalog=ModelCatalog(
+                repository=get_persistent_model_catalog_repository()
+            ),
+        )
         if _settings.model_deployment_backend == "kubernetes"
         else LocalModelDeploymentManager(gpu_available=False)
     ),
     jobs=_job_service,
     job_repository=_job_repository,
+    model_catalog=ModelCatalog(repository=get_persistent_model_catalog_repository()),
     timeout_seconds=_settings.model_operation_timeout_seconds,
 )
 
@@ -219,6 +228,8 @@ def delete_deployment(
         job = service.delete(deployment_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Deployment not found.") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     background_tasks.add_task(service.execute_delete, deployment_id, job.job_id)
 

@@ -2,12 +2,17 @@
 
 from application.ports.benchmark_repository import BenchmarkRepository
 from application.ports.job_repository import JobRepository
+from application.ports.model_catalog_repository import ModelCatalogRepository
 from application.ports.model_deployment_repository import ModelDeploymentRepository
+from application.services.default_model_catalog import default_model_catalog_entries
 from infrastructure.config import get_settings
 from infrastructure.persistence.sqlite_benchmark_repository import (
     SQLiteBenchmarkRepository,
 )
 from infrastructure.persistence.sqlite_job_repository import SQLiteJobRepository
+from infrastructure.persistence.sqlite_model_catalog_repository import (
+    SQLiteModelCatalogRepository,
+)
 from infrastructure.persistence.sqlite_model_deployment_repository import (
     SQLiteModelDeploymentRepository,
 )
@@ -15,6 +20,7 @@ from infrastructure.persistence.sqlite_model_deployment_repository import (
 _job_repository: JobRepository | None = None
 _benchmark_repository: BenchmarkRepository | None = None
 _deployment_repository: ModelDeploymentRepository | None = None
+_model_catalog_repository: ModelCatalogRepository | None = None
 
 
 def get_persistent_job_repository() -> JobRepository:
@@ -52,3 +58,23 @@ def get_persistent_deployment_repository() -> ModelDeploymentRepository:
         )
 
     return _deployment_repository
+
+
+def get_persistent_model_catalog_repository() -> ModelCatalogRepository:
+    """Return the configured persistent model catalog repository."""
+
+    global _model_catalog_repository
+
+    if _model_catalog_repository is None:
+        repository = SQLiteModelCatalogRepository(get_settings().sqlite_database_path)
+
+        if repository.get("qwen3-0.6b") is not None:
+            repository.delete("qwen3-0.6b")
+
+        for entry in default_model_catalog_entries():
+            if repository.get(entry.model_id) is None:
+                repository.save(entry)
+
+        _model_catalog_repository = repository
+
+    return _model_catalog_repository
