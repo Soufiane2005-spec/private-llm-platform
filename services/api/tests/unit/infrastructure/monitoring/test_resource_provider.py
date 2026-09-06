@@ -27,6 +27,10 @@ def test_get_system_usage_returns_cpu_and_memory_metrics(
             total=16_000_000_000,
         ),
     )
+    monkeypatch.setattr(
+        "infrastructure.monitoring.resource_provider.shutil.which",
+        lambda _command: None,
+    )
 
     provider = SystemResourceProvider()
 

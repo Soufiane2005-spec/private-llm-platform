@@ -7,11 +7,13 @@ from application.ports.benchmark_executor import BenchmarkExecutor
 from application.ports.benchmark_repository import BenchmarkRepository
 from application.ports.job_repository import JobRepository
 from application.services.job_service import JobService
+from application.services.model_catalog import ModelCatalog, ModelNotFoundError
 from domain.benchmarks.benchmark_record import BenchmarkRecord
 from domain.benchmarks.resource_metrics import BenchmarkResourceMetrics
 from domain.benchmarks.result import BenchmarkResult
 from domain.jobs.job import Job
 from domain.models.llm_engine import LLMEngine
+from domain.models.model_catalog import ModelCatalogEntry
 
 
 class BenchmarkExecutionService:
@@ -23,13 +25,17 @@ class BenchmarkExecutionService:
         repository: BenchmarkRepository,
         jobs: JobService,
         job_repository: JobRepository,
+        model_catalog: ModelCatalog,
         ollama_executor: BenchmarkExecutor,
+        vllm_executor: BenchmarkExecutor,
         resource_sampler: object,
     ) -> None:
         self._repository = repository
         self._jobs = jobs
         self._job_repository = job_repository
+        self._model_catalog = model_catalog
         self._ollama_executor = ollama_executor
+        self._vllm_executor = vllm_executor
         self._resource_sampler = resource_sampler
 
     def run(
@@ -47,7 +53,8 @@ class BenchmarkExecutionService:
         if not prompts:
             raise ValueError("at least one prompt is required.")
 
-        job = self._jobs.submit(f"benchmark:{engine.value}:{model}")
+        catalog_model = self._require_catalog_model(model, engine)
+        job = self._jobs.submit(f"benchmark:{engine.value}:{catalog_model.model_id}")
         job = job.mark_running().register_attempt()
         self._job_repository.save(job)
 
@@ -56,7 +63,8 @@ class BenchmarkExecutionService:
             records = tuple(
                 self._run_prompt(
                     executor=executor,
-                    model=model,
+                    runtime_model=catalog_model.benchmark_model_id,
+                    model_id=catalog_model.model_id,
                     prompt=prompt,
                     index=index,
                     engine=engine,
@@ -85,8 +93,9 @@ class BenchmarkExecutionService:
         """Create a pending benchmark job for background execution."""
 
         self._validate_request(model=model, prompts=prompts)
+        catalog_model = self._require_catalog_model(model, engine)
         return self._jobs.submit(
-            f"benchmark:{engine.value}:{model}",
+            f"benchmark:{engine.value}:{catalog_model.model_id}",
             enqueue=False,
         )
 
@@ -101,6 +110,7 @@ class BenchmarkExecutionService:
         """Execute a pending benchmark job and persist its records."""
 
         self._validate_request(model=model, prompts=prompts)
+        catalog_model = self._require_catalog_model(model, engine)
         job = self._job_repository.get(job_id)
 
         if job is None:
@@ -114,7 +124,8 @@ class BenchmarkExecutionService:
             records = tuple(
                 self._run_prompt(
                     executor=executor,
-                    model=model,
+                    runtime_model=catalog_model.benchmark_model_id,
+                    model_id=catalog_model.model_id,
                     prompt=prompt,
                     index=index,
                     engine=engine,
@@ -137,7 +148,31 @@ class BenchmarkExecutionService:
         if engine is LLMEngine.OLLAMA:
             return self._ollama_executor
 
-        raise ValueError("vLLM benchmark execution requires a configured GPU runtime.")
+        if engine is LLMEngine.VLLM:
+            return self._vllm_executor
+
+        raise ValueError(f"Unsupported benchmark engine: {engine.value}.")
+
+    def _require_catalog_model(
+        self,
+        model_id: str,
+        engine: LLMEngine,
+    ) -> ModelCatalogEntry:
+        try:
+            model = self._model_catalog.get(model_id)
+        except ModelNotFoundError as exc:
+            raise ValueError(f"Model '{model_id}' was not found in the catalog.") from exc
+
+        if model.engine is not engine:
+            raise ValueError(
+                f"Model '{model_id}' is configured for {model.engine.value}, "
+                f"not {engine.value}."
+            )
+
+        if not model.enabled:
+            raise ValueError(f"Model '{model_id}' is disabled.")
+
+        return model
 
     @staticmethod
     def _validate_request(*, model: str, prompts: tuple[str, ...]) -> None:
@@ -151,7 +186,8 @@ class BenchmarkExecutionService:
         self,
         *,
         executor: BenchmarkExecutor,
-        model: str,
+        runtime_model: str,
+        model_id: str,
         prompt: str,
         index: int,
         engine: LLMEngine,
@@ -159,12 +195,12 @@ class BenchmarkExecutionService:
         if not prompt.strip():
             raise ValueError("prompt cannot be empty.")
 
-        execution = executor.execute(model=model, prompt=prompt)
+        execution = executor.execute(model=runtime_model, prompt=prompt)
         resources = self._sample_resources()
 
         return BenchmarkRecord(
             benchmark_id=str(uuid4()),
-            model_id=model,
+            model_id=model_id,
             result=BenchmarkResult(
                 prompt_id=f"prompt-{index}",
                 engine=engine.value,
