@@ -28,6 +28,12 @@ class FakeDashboardService:
                     "status": "unavailable",
                 },
             ],
+            "observability": {
+                "grafana_url": "http://127.0.0.1:3000",
+                "grafana_reachable": True,
+                "grafana_message": "Grafana is reachable.",
+                "prometheus_configured": True,
+            },
         }
 
 
@@ -53,6 +59,12 @@ class FakeCpuOnlyDashboardService:
                     "status": "unknown",
                 },
             ],
+            "observability": {
+                "grafana_url": "http://127.0.0.1:3000",
+                "grafana_reachable": False,
+                "grafana_message": "Grafana is not reachable at the configured URL.",
+                "prometheus_configured": False,
+            },
         }
 
 
@@ -63,8 +75,8 @@ def test_dashboard_endpoint_returns_monitoring_data(
 
     monkeypatch.setattr(
         dashboard_route,
-        "_dashboard_service",
-        FakeDashboardService(),
+        "_build_dashboard_service",
+        lambda: FakeDashboardService(),
     )
 
     client = TestClient(app)
@@ -91,6 +103,12 @@ def test_dashboard_endpoint_returns_monitoring_data(
         ],
         "pods": [],
         "alerts": [],
+        "observability": {
+            "grafana_url": "http://127.0.0.1:3000",
+            "grafana_reachable": True,
+            "grafana_message": "Grafana is reachable.",
+            "prometheus_configured": True,
+        },
     }
 
 
@@ -101,8 +119,8 @@ def test_dashboard_endpoint_supports_missing_gpu(
 
     monkeypatch.setattr(
         dashboard_route,
-        "_dashboard_service",
-        FakeCpuOnlyDashboardService(),
+        "_build_dashboard_service",
+        lambda: FakeCpuOnlyDashboardService(),
     )
 
     client = TestClient(app)
@@ -125,8 +143,8 @@ def test_dashboard_endpoint_exposes_engine_states(
 
     monkeypatch.setattr(
         dashboard_route,
-        "_dashboard_service",
-        FakeCpuOnlyDashboardService(),
+        "_build_dashboard_service",
+        lambda: FakeCpuOnlyDashboardService(),
     )
 
     client = TestClient(app)

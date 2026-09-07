@@ -217,9 +217,66 @@ class KubernetesModelDeploymentManager:
 
         return False
 
-    def _deployment_body(self, deployment: ModelDeployment, *, replicas: int) -> dict:
+    def _deployment_body(
+        self,
+        deployment: ModelDeployment,
+        *,
+        replicas: int,
+    ) -> dict:
         name = self._resource_name(deployment)
         container = self._container(deployment)
+
+        pod_spec: dict = {
+            "securityContext": {
+                "runAsNonRoot": True,
+                "runAsUser": 10001,
+                "runAsGroup": 10001,
+                "fsGroup": 10001,
+                "seccompProfile": {"type": "RuntimeDefault"},
+            },
+            "containers": [container],
+        }
+
+        if deployment.engine is LLMEngine.VLLM:
+            pod_spec["volumes"] = [
+                {
+                    "name": "dshm",
+                    "emptyDir": {
+                        "medium": "Memory",
+                        "sizeLimit": "2Gi",
+                    },
+                },
+                {
+                    "name": "model-cache",
+                    "emptyDir": {},
+                },
+                {
+                    "name": "tmp",
+                    "emptyDir": {},
+                },
+            ]
+
+        deployment_spec: dict = {
+            "replicas": replicas,
+            "selector": {
+                "matchLabels": {
+                    "app": name,
+                }
+            },
+            "template": {
+                "metadata": {
+                    "labels": {
+                        "app": name,
+                    }
+                },
+                "spec": pod_spec,
+            },
+        }
+
+        if deployment.engine is LLMEngine.VLLM:
+            deployment_spec["strategy"] = {
+                "type": "Recreate",
+            }
 
         return {
             "apiVersion": "apps/v1",
@@ -232,23 +289,7 @@ class KubernetesModelDeploymentManager:
                     "managed-by": "private-llm-platform",
                 },
             },
-            "spec": {
-                "replicas": replicas,
-                "selector": {"matchLabels": {"app": name}},
-                "template": {
-                    "metadata": {"labels": {"app": name}},
-                    "spec": {
-                        "securityContext": {
-                            "runAsNonRoot": True,
-                            "runAsUser": 10001,
-                            "runAsGroup": 10001,
-                            "fsGroup": 10001,
-                            "seccompProfile": {"type": "RuntimeDefault"},
-                        },
-                        "containers": [container],
-                    },
-                },
-            },
+            "spec": deployment_spec,
         }
 
     def _container(self, deployment: ModelDeployment) -> dict:
@@ -256,15 +297,31 @@ class KubernetesModelDeploymentManager:
             return {
                 "name": "ollama",
                 "image": "ollama/ollama:0.32.14",
-                "ports": [{"containerPort": 11434}],
+                "ports": [
+                    {
+                        "containerPort": 11434,
+                    }
+                ],
                 "env": [
-                    {"name": "OLLAMA_HOST", "value": "0.0.0.0:11434"},
-                    {"name": "OLLAMA_MODEL", "value": deployment.model},
+                    {
+                        "name": "OLLAMA_HOST",
+                        "value": "0.0.0.0:11434",
+                    },
+                    {
+                        "name": "OLLAMA_MODEL",
+                        "value": deployment.model,
+                    },
                 ],
                 "securityContext": self._container_security_context(),
                 "resources": {
-                    "requests": {"cpu": "500m", "memory": "1Gi"},
-                    "limits": {"cpu": "4", "memory": "6Gi"},
+                    "requests": {
+                        "cpu": "500m",
+                        "memory": "1Gi",
+                    },
+                    "limits": {
+                        "cpu": "4",
+                        "memory": "6Gi",
+                    },
                 },
             }
 
@@ -274,13 +331,40 @@ class KubernetesModelDeploymentManager:
         return {
             "name": "vllm",
             "image": "vllm/vllm-openai:v0.27.0",
-            "ports": [{"containerPort": 8000}],
+            "ports": [
+                {
+                    "containerPort": 8000,
+                }
+            ],
             "env": [
-                {"name": "HF_TOKEN", "value": ""},
-                {"name": "VLLM_LOGGING_LEVEL", "value": "INFO"},
-                {"name": "VLLM_USE_V2_MODEL_RUNNER", "value": "0"},
-                {"name": "VLLM_WSL2_ENABLE_PIN_MEMORY", "value": "1"},
-                {"name": "HF_HOME", "value": "/root/.cache/huggingface"},
+                {
+                    "name": "HF_TOKEN",
+                    "value": "",
+                },
+                {
+                    "name": "VLLM_LOGGING_LEVEL",
+                    "value": "INFO",
+                },
+                {
+                    "name": "VLLM_USE_V2_MODEL_RUNNER",
+                    "value": "0",
+                },
+                {
+                    "name": "VLLM_WSL2_ENABLE_PIN_MEMORY",
+                    "value": "1",
+                },
+                {
+                    "name": "HF_HOME",
+                    "value": "/cache/huggingface",
+                },
+                {
+                    "name": "XDG_CACHE_HOME",
+                    "value": "/cache",
+                },
+                {
+                    "name": "HOME",
+                    "value": "/tmp",
+                },
             ],
             "args": [
                 "--model",
@@ -293,35 +377,69 @@ class KubernetesModelDeploymentManager:
                 context_length,
                 "--max-num-seqs",
                 "1",
+                "--gpu-memory-utilization",
+                "0.75",
                 "--enforce-eager",
             ],
             "startupProbe": {
-                "httpGet": {"path": "/health", "port": 8000},
+                "httpGet": {
+                    "path": "/health",
+                    "port": 8000,
+                },
                 "periodSeconds": 10,
                 "timeoutSeconds": 5,
                 "failureThreshold": 90,
             },
             "readinessProbe": {
-                "httpGet": {"path": "/health", "port": 8000},
+                "httpGet": {
+                    "path": "/health",
+                    "port": 8000,
+                },
                 "periodSeconds": 10,
                 "timeoutSeconds": 5,
                 "failureThreshold": 6,
             },
             "livenessProbe": {
-                "httpGet": {"path": "/health", "port": 8000},
+                "httpGet": {
+                    "path": "/health",
+                    "port": 8000,
+                },
                 "periodSeconds": 30,
                 "timeoutSeconds": 5,
                 "failureThreshold": 3,
             },
             "securityContext": self._container_security_context(),
             "resources": {
-                "requests": {"cpu": "1", "memory": "2Gi", "nvidia.com/gpu": "1"},
-                "limits": {"cpu": "6", "memory": "8Gi", "nvidia.com/gpu": "1"},
+                "requests": {
+                    "cpu": "1",
+                    "memory": "2Gi",
+                    "nvidia.com/gpu": "1",
+                },
+                "limits": {
+                    "cpu": "6",
+                    "memory": "8Gi",
+                    "nvidia.com/gpu": "1",
+                },
             },
+            "volumeMounts": [
+                {
+                    "name": "dshm",
+                    "mountPath": "/dev/shm",
+                },
+                {
+                    "name": "model-cache",
+                    "mountPath": "/cache/huggingface",
+                },
+                {
+                    "name": "tmp",
+                    "mountPath": "/tmp",
+                },
+            ],
         }
 
     def _upsert_service(self, deployment: ModelDeployment) -> None:
         name = self._resource_name(deployment)
+
         body = {
             "apiVersion": "v1",
             "kind": "Service",
@@ -334,7 +452,9 @@ class KubernetesModelDeploymentManager:
                 },
             },
             "spec": {
-                "selector": {"app": name},
+                "selector": {
+                    "app": name,
+                },
                 "ports": [
                     {
                         "port": 8000,
@@ -367,9 +487,13 @@ class KubernetesModelDeploymentManager:
                     "Unable to create Kubernetes model service."
                 ) from create_exc
 
-    def _require_catalog_entry(self, deployment: ModelDeployment) -> ModelCatalogEntry:
+    def _require_catalog_entry(
+        self,
+        deployment: ModelDeployment,
+    ) -> ModelCatalogEntry:
         if self._model_catalog is None:
             served_name = deployment.model.split("/")[-1].lower()
+
             return ModelCatalogEntry(
                 model_id=self._slugify(served_name),
                 display_name=served_name,
@@ -389,6 +513,7 @@ class KubernetesModelDeploymentManager:
                 entry.engine_model_id,
                 entry.benchmark_model_id,
             }
+
             if deployment.model in identifiers:
                 return entry
 
@@ -407,7 +532,9 @@ class KubernetesModelDeploymentManager:
             "runAsUser": 10001,
             "runAsGroup": 10001,
             "readOnlyRootFilesystem": False,
-            "capabilities": {"drop": ["ALL"]},
+            "capabilities": {
+                "drop": ["ALL"],
+            },
         }
 
     @staticmethod
@@ -415,12 +542,18 @@ class KubernetesModelDeploymentManager:
         if deployment.engine is LLMEngine.OLLAMA:
             return "ollama"
 
-        clean_model = KubernetesModelDeploymentManager._slugify(deployment.model)
+        clean_model = KubernetesModelDeploymentManager._slugify(
+            deployment.model
+        )
         return f"model-{deployment.engine.value}-{clean_model}"[:63].rstrip("-")
 
     @staticmethod
     def _slugify(value: str) -> str:
-        return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+        return re.sub(
+            r"[^a-z0-9]+",
+            "-",
+            value.lower(),
+        ).strip("-")
 
     @staticmethod
     def _is_not_found_error(exc: Exception) -> bool:

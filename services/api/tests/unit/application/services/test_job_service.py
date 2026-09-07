@@ -1,4 +1,8 @@
-from application.services.job_service import JobService
+from application.services.job_service import (
+    ORPHANED_RUNNING_JOB_ERROR,
+    JobService,
+    fail_orphaned_running_jobs,
+)
 from domain.jobs.job import Job, JobStatus
 from infrastructure.persistence.in_memory_job_repository import (
     InMemoryJobRepository,
@@ -141,3 +145,23 @@ def test_service_run_once_requires_dead_letter_queue() -> None:
         assert str(exc) == "dead letter queue is required to run jobs."
     else:
         raise AssertionError("Expected RuntimeError when worker has no DLQ.")
+
+
+def test_fail_orphaned_running_jobs_marks_only_running_jobs_failed() -> None:
+    repository = InMemoryJobRepository()
+    pending = Job(job_id="pending", job_type="benchmark")
+    running = Job(job_id="running", job_type="benchmark").mark_running()
+    completed = Job(job_id="completed", job_type="benchmark").mark_running()
+    completed = completed.mark_completed()
+
+    repository.save(pending)
+    repository.save(running)
+    repository.save(completed)
+
+    failed = fail_orphaned_running_jobs(repository)
+
+    assert [job.job_id for job in failed] == ["running"]
+    assert repository.get("pending").status is JobStatus.PENDING
+    assert repository.get("completed").status is JobStatus.COMPLETED
+    assert repository.get("running").status is JobStatus.FAILED
+    assert repository.get("running").error == ORPHANED_RUNNING_JOB_ERROR

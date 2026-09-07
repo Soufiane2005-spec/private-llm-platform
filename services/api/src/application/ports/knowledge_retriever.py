@@ -11,6 +11,8 @@ class KnowledgeMatch:
     source: str
     content: str
     score: float
+    chunk_index: int | None = None
+    page: int | None = None
 
 
 class KnowledgeRetriever(Protocol):

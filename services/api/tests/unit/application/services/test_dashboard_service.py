@@ -59,7 +59,12 @@ def test_dashboard_returns_resource_metrics_and_engine_states() -> None:
         ),
     )
 
-    service = DashboardService(monitor)
+    service = DashboardService(
+        monitor,
+        grafana_url="http://grafana.local",
+        grafana_reachable=True,
+        prometheus_configured=True,
+    )
 
     dashboard = service.get_dashboard()
 
@@ -81,6 +86,12 @@ def test_dashboard_returns_resource_metrics_and_engine_states() -> None:
         ],
         "pods": [],
         "alerts": [],
+        "observability": {
+            "grafana_url": "http://grafana.local",
+            "grafana_reachable": True,
+            "grafana_message": "Grafana is reachable.",
+            "prometheus_configured": True,
+        },
     }
 
 
@@ -111,6 +122,7 @@ def test_dashboard_supports_unavailable_gpu_metrics() -> None:
     }
 
     assert dashboard["engines"] == []
+    assert dashboard["observability"]["grafana_reachable"] is False
 
 
 def test_dashboard_exposes_unknown_engine_states() -> None:

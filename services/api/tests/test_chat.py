@@ -2,6 +2,8 @@
 
 from fastapi.testclient import TestClient
 
+from application.ports.knowledge_retriever import KnowledgeMatch
+from application.services.knowledge_ingestion_service import IngestedKnowledgeDocument
 from application.services.rag_chat_service import RagChatResult
 from infrastructure.llm.ollama_chat_model import OllamaChatError
 from interfaces.http.app import create_app
@@ -24,7 +26,16 @@ class SuccessfulChatService:
 
         return RagChatResult(
             reply="Réponse documentaire.",
-            sources=["demo_faq.md"],
+            sources=[
+                KnowledgeMatch(
+                    source="demo_faq.md",
+                    content="Contenu source",
+                    score=1.0,
+                    chunk_index=1,
+                    page=None,
+                )
+            ],
+            model="qwen2.5:1.5b",
         )
 
 
@@ -54,6 +65,13 @@ class UnavailableChatService:
         )
 
 
+class FakeIngestionService:
+    def ingest_text(self, *, source: str, content: str) -> IngestedKnowledgeDocument:
+        assert source == "procedure.txt"
+        assert "irrigation" in content
+        return IngestedKnowledgeDocument(source=source, bytes_written=len(content))
+
+
 def test_chat_returns_rag_response(monkeypatch) -> None:
     monkeypatch.setattr(
         chat_routes,
@@ -73,7 +91,15 @@ def test_chat_returns_rag_response(monkeypatch) -> None:
     assert response.json() == {
         "model": "qwen2.5:1.5b",
         "reply": "Réponse documentaire.",
-        "sources": ["demo_faq.md"],
+        "sources": [
+            {
+                "source": "demo_faq.md",
+                "content": "Contenu source",
+                "score": 1.0,
+                "chunk_index": 1,
+                "page": None,
+            }
+        ],
     }
 
 
@@ -125,3 +151,25 @@ def test_chat_returns_service_unavailable(
     )
 
     assert response.status_code == 503
+
+
+def test_ingest_knowledge_returns_written_document(monkeypatch) -> None:
+    monkeypatch.setattr(
+        chat_routes,
+        "_ingestion_service",
+        FakeIngestionService(),
+    )
+
+    response = client.post(
+        "/chat/ingest",
+        json={
+            "source": "procedure.txt",
+            "content": "Procedure irrigation sourcee.",
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "source": "procedure.txt",
+        "bytes_written": 29,
+    }

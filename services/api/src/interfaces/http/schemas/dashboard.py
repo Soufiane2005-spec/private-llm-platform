@@ -34,6 +34,15 @@ class DashboardAlertSchema(BaseModel):
     state: str
 
 
+class ObservabilitySchema(BaseModel):
+    """External observability access exposed by configuration."""
+
+    grafana_url: str
+    grafana_reachable: bool
+    grafana_message: str
+    prometheus_configured: bool
+
+
 class DashboardResponseSchema(BaseModel):
     """Aggregated dashboard response."""
 
@@ -41,3 +50,4 @@ class DashboardResponseSchema(BaseModel):
     engines: list[DashboardEngineSchema]
     pods: list[DashboardPodSchema] = []
     alerts: list[DashboardAlertSchema] = []
+    observability: ObservabilitySchema

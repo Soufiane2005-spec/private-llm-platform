@@ -7,6 +7,10 @@ from application.ports.knowledge_retriever import (
     KnowledgeMatch,
     KnowledgeRetriever,
 )
+from application.services.model_catalog import ModelCatalog, ModelNotFoundError
+from application.services.model_runtime_availability import ModelRuntimeAvailability
+from domain.models.llm_engine import LLMEngine
+from domain.models.model_catalog import ModelCatalogEntry
 
 NO_INFORMATION_REPLY = (
     "Je n’ai pas trouvé cette information dans la documentation disponible."
@@ -18,7 +22,8 @@ class RagChatResult:
     """Result returned by the RAG chatbot."""
 
     reply: str
-    sources: list[str]
+    sources: list[KnowledgeMatch]
+    model: str
 
 
 class RagChatService:
@@ -29,9 +34,13 @@ class RagChatService:
         *,
         chat_model: ChatModel,
         knowledge_retriever: KnowledgeRetriever,
+        model_catalog: ModelCatalog | None = None,
+        runtime_availability: ModelRuntimeAvailability | None = None,
     ) -> None:
         self._chat_model = chat_model
         self._knowledge_retriever = knowledge_retriever
+        self._model_catalog = model_catalog
+        self._runtime_availability = runtime_availability
 
     def chat(
         self,
@@ -50,6 +59,9 @@ class RagChatService:
         if not clean_message:
             raise ValueError("message cannot be empty.")
 
+        catalog_model = self._resolve_model(clean_model)
+        runtime_model = catalog_model.engine_model_id if catalog_model else clean_model
+
         matches = self._knowledge_retriever.search(
             clean_message,
             limit=3,
@@ -59,6 +71,7 @@ class RagChatService:
             return RagChatResult(
                 reply=NO_INFORMATION_REPLY,
                 sources=[],
+                model=runtime_model,
             )
 
         prompt = self._build_prompt(
@@ -67,21 +80,57 @@ class RagChatService:
         )
 
         reply = self._chat_model.generate_reply(
-            model=clean_model,
+            model=runtime_model,
             message=prompt,
-        )
-
-        sources = list(
-            dict.fromkeys(
-                match.source
-                for match in matches
-            )
         )
 
         return RagChatResult(
             reply=reply,
-            sources=sources,
+            sources=matches,
+            model=runtime_model,
         )
+
+    def _resolve_model(self, model: str) -> ModelCatalogEntry | None:
+        if self._model_catalog is None:
+            return None
+
+        catalog_model = self._find_catalog_model(model)
+
+        if catalog_model.engine is not LLMEngine.OLLAMA:
+            raise ValueError(
+                f"Chat generation is not configured for {catalog_model.engine.value}."
+            )
+
+        if not catalog_model.enabled:
+            raise ValueError(f"Model '{catalog_model.model_id}' is disabled.")
+
+        if self._runtime_availability is not None:
+            state = self._runtime_availability.state_for(catalog_model)
+            if not state.runtime_available:
+                detail = state.reason or "runtime is unavailable"
+                raise ValueError(
+                    f"Model '{catalog_model.model_id}' is not runtime available: "
+                    f"{detail}."
+                )
+
+        return catalog_model
+
+    def _find_catalog_model(self, model: str) -> ModelCatalogEntry:
+        assert self._model_catalog is not None
+
+        for entry in self._model_catalog.list_models():
+            identifiers = {
+                entry.model_id,
+                entry.engine_model_id,
+                entry.benchmark_model_id,
+            }
+            if model in identifiers:
+                return entry
+
+        try:
+            return self._model_catalog.get(model)
+        except ModelNotFoundError as exc:
+            raise ValueError(f"Model '{model}' was not found in the catalog.") from exc
 
     @staticmethod
     def _build_prompt(
@@ -95,9 +144,14 @@ class RagChatService:
             matches,
             start=1,
         ):
+            location = (
+                f"{match.source} page {match.page}"
+                if match.page is not None
+                else match.source
+            )
             context_sections.append(
-                f"[Source {index}: {match.source}]\n"
-                f"{match.content}"
+                f"[Source {index}: {location}; score={match.score:.3f}]\n"
+                f"{match.content[:1200]}"
             )
 
         context = "\n\n".join(context_sections)

@@ -55,6 +55,7 @@ class Settings(BaseSettings):
     ollama_timeout_seconds: float = 120.0
     vllm_base_url: str = "http://127.0.0.1:8000"
     vllm_timeout_seconds: float = 120.0
+    grafana_url: str = "http://127.0.0.1:3000"
     cors_allowed_origins: str = ",".join(DEFAULT_CORS_ALLOWED_ORIGINS)
     database_url: str = "sqlite:///./data/platform.db"
     prometheus_base_url: str | None = None

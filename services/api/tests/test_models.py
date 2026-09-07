@@ -1,4 +1,4 @@
-"""HTTP tests for model catalog endpoints."""
+﻿"""HTTP tests for model catalog endpoints."""
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from application.services.auth_service import AuthService
 from application.services.model_catalog import ModelCatalog, ModelNotFoundError
 from domain.auth.user import PlatformUser, UserRole
+from domain.models.deployment import ModelDeployment, ModelDeploymentStatus
 from domain.models.llm_engine import LLMEngine
 from domain.models.model_catalog import ModelCatalogEntry
 from infrastructure.persistence.in_memory_model_catalog_repository import (
@@ -15,6 +16,7 @@ from infrastructure.persistence.in_memory_user_repository import InMemoryUserRep
 from infrastructure.security.jwt_token_service import JWTTokenService
 from interfaces.http.app import create_app
 from interfaces.http.dependencies.auth import get_auth_service
+from interfaces.http.routes import models as model_routes
 from interfaces.http.routes.models import get_model_catalog
 
 
@@ -26,6 +28,27 @@ class TestPasswordHasher:
 
     def hash(self, password: str) -> str:
         return f"hashed:{password}"
+
+
+class CountingDeploymentRepository:
+    """Deployment repository fake that records list calls."""
+
+    def __init__(self, deployments: tuple[ModelDeployment, ...]) -> None:
+        self.deployments = deployments
+        self.list_calls = 0
+
+    def save(self, deployment: ModelDeployment) -> None:
+        raise NotImplementedError
+
+    def get(self, deployment_id: str) -> ModelDeployment | None:
+        raise NotImplementedError
+
+    def list(self) -> tuple[ModelDeployment, ...]:
+        self.list_calls += 1
+        return self.deployments
+
+    def delete(self, deployment_id: str) -> None:
+        raise NotImplementedError
 
 
 def auth_service(role: UserRole = UserRole.ADMIN) -> AuthService:
@@ -109,8 +132,57 @@ def test_list_models_returns_default_catalog() -> None:
     assert body[1]["benchmark_model_id"] == "smollm2-135m"
 
 
+def test_list_models_uses_refreshed_deployment_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Use refreshed deployment state when building the model catalog response."""
+
+    class FakeDeploymentService:
+        def __init__(self) -> None:
+            self.list_calls = 0
+
+        def list_deployments(self) -> tuple[ModelDeployment, ...]:
+            self.list_calls += 1
+            return (
+                ModelDeployment(
+                    deployment_id="deployment-vllm-running",
+                    model="smollm2-135m",
+                    engine=LLMEngine.VLLM,
+                    status=ModelDeploymentStatus.RUNNING,
+                    runtime_state="ready:1/1",
+                    gpu_available=True,
+                ),
+            )
+
+    service = FakeDeploymentService()
+
+    client, _catalog = create_test_client()
+    client.app.dependency_overrides[
+        model_routes.get_deployment_service
+    ] = lambda: service
+
+    try:
+        response = client.get("/models")
+    finally:
+        client.app.dependency_overrides.pop(
+            model_routes.get_deployment_service,
+            None,
+        )
+
+    assert response.status_code == 200
+    assert service.list_calls == 1
+
+    body = response.json()
+    smollm = next(
+        model
+        for model in body
+        if model["model_id"] == "smollm2-135m"
+    )
+
+    assert smollm["deployment_status"] == "running"
 def test_create_vllm_model_persists_catalog_entry() -> None:
     client, catalog = create_test_client()
+
 
     response = client.post(
         "/models",
