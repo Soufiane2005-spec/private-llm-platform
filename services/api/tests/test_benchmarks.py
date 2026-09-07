@@ -205,6 +205,19 @@ def test_list_benchmarks_returns_records() -> None:
     ]
 
 
+def test_historical_benchmark_for_unavailable_model_still_loads() -> None:
+    """Benchmark history is serialized without consulting current runtimes."""
+
+    repository = InMemoryBenchmarkRepository()
+    repository.save(create_record())
+    client = create_test_client(repository)
+
+    response = client.get("/benchmarks")
+
+    assert response.status_code == 200
+    assert response.json()[0]["model_id"] == "qwen3-0.6b"
+
+
 def test_get_benchmark_report_returns_none_when_empty() -> None:
     repository = InMemoryBenchmarkRepository()
     client = create_test_client(repository)

@@ -25,6 +25,7 @@ def test_search_returns_matching_document(
 
     assert results
     assert results[0].source == "irrigation.md"
+    assert results[0].chunk_index == 1
 
 
 def test_search_returns_empty_for_unknown_query(
@@ -53,3 +54,19 @@ def test_search_returns_empty_when_directory_missing(
     )
 
     assert retriever.search("irrigation") == []
+
+
+def test_search_preserves_page_metadata_when_present(
+    tmp_path: Path,
+) -> None:
+    document = tmp_path / "decompte.md"
+    document.write_text(
+        "Decompte page 6. Total TTC declare 1 246 840 MAD.",
+        encoding="utf-8",
+    )
+
+    retriever = LocalKnowledgeRetriever(tmp_path)
+
+    results = retriever.search("total TTC declare")
+
+    assert results[0].page == 6

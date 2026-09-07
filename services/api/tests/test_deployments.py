@@ -6,6 +6,8 @@ from application.services.auth_service import AuthService
 from application.services.job_service import JobService
 from application.services.model_deployment_service import ModelDeploymentService
 from domain.auth.user import PlatformUser, UserRole
+from domain.models.deployment import ModelDeployment
+from domain.models.llm_engine import LLMEngine
 from infrastructure.models.local_model_deployment_manager import (
     LocalModelDeploymentManager,
 )
@@ -33,7 +35,62 @@ class TestPasswordHasher:
         return password == PASSWORD and password_hash == PASSWORD_HASH
 
 
-def create_client(role: UserRole = UserRole.ADMIN) -> TestClient:
+class FakeOllamaRuntimeClient:
+    """In-memory double for the Ollama runtime model management port."""
+
+    def __init__(
+        self,
+        *,
+        initial_models: tuple[str, ...] = (),
+        fail_pull_with: Exception | None = None,
+    ) -> None:
+        self._models = set(initial_models)
+        self._fail_pull_with = fail_pull_with
+        self.pull_calls: list[str] = []
+
+    def has_model(self, model: str) -> bool:
+        return model in self._models
+
+    def pull_model(self, model: str) -> None:
+        self.pull_calls.append(model)
+        if self._fail_pull_with is not None:
+            raise self._fail_pull_with
+        self._models.add(model)
+
+    def ensure_model_available(self, model: str) -> bool:
+        if self.has_model(model):
+            return False
+        self.pull_model(model)
+        return True
+
+
+class FailingDeploymentManager:
+    """Deployment manager that raises to exercise persisted failure state."""
+
+    def deploy(self, deployment: ModelDeployment) -> ModelDeployment:
+        raise RuntimeError("runtime exploded")
+
+    def start(self, deployment: ModelDeployment) -> ModelDeployment:
+        raise RuntimeError("runtime exploded")
+
+    def stop(self, deployment: ModelDeployment) -> ModelDeployment:
+        raise RuntimeError("runtime exploded")
+
+    def restart(self, deployment: ModelDeployment) -> ModelDeployment:
+        raise RuntimeError("runtime exploded")
+
+    def delete(self, deployment: ModelDeployment) -> None:
+        raise RuntimeError("runtime exploded")
+
+    def status(self, deployment: ModelDeployment) -> ModelDeployment:
+        return deployment
+
+
+def create_client(
+    role: UserRole = UserRole.ADMIN,
+    *,
+    ollama_client: FakeOllamaRuntimeClient | None = None,
+) -> TestClient:
     """Create a test client with isolated deployment state."""
 
     job_repository = InMemoryJobRepository()
@@ -43,7 +100,16 @@ def create_client(role: UserRole = UserRole.ADMIN) -> TestClient:
     )
     deployment_service = ModelDeploymentService(
         deployments=InMemoryModelDeploymentRepository(),
-        manager=LocalModelDeploymentManager(gpu_available=False),
+        manager=LocalModelDeploymentManager(
+            gpu_available=False,
+            ollama_client=(
+                ollama_client
+                if ollama_client is not None
+                else FakeOllamaRuntimeClient(
+                    initial_models=("qwen2.5:1.5b", "llama3.2:1b")
+                )
+            ),
+        ),
         jobs=job_service,
         job_repository=job_repository,
     )
@@ -115,9 +181,122 @@ def test_deploy_ollama_model_creates_async_job() -> None:
 
     assert final_deployment.status_code == 200
     assert final_deployment.json()["status"] == "running"
-    assert final_deployment.json()["runtime_state"] == "local-runtime-ready"
+    assert final_deployment.json()["runtime_state"] == "ollama-model-already-present"
     assert final_job.status_code == 200
     assert final_job.json()["status"] == "completed"
+
+
+def test_deploy_ollama_model_pulls_when_absent() -> None:
+    """Deploying a catalog model absent from Ollama triggers a real pull."""
+
+    fake_client = FakeOllamaRuntimeClient(initial_models=())
+    client = create_client(ollama_client=fake_client)
+
+    response = client.post(
+        "/deployments",
+        json={"model": "phi3:mini", "engine": "ollama"},
+        headers=auth_headers(client),
+    )
+
+    assert response.status_code == 202
+    deployment_id = response.json()["deployment"]["deployment_id"]
+
+    final_deployment = client.get(
+        f"/deployments/{deployment_id}",
+        headers=auth_headers(client),
+    ).json()
+
+    assert fake_client.pull_calls == ["phi3:mini"]
+    assert fake_client.has_model("phi3:mini") is True
+    assert final_deployment["status"] == "running"
+    assert final_deployment["runtime_state"] == "ollama-model-pulled"
+
+
+def test_deploy_ollama_model_already_present_is_idempotent() -> None:
+    """Deploying a model already present in Ollama does not re-pull it."""
+
+    fake_client = FakeOllamaRuntimeClient(initial_models=("phi3:mini",))
+    client = create_client(ollama_client=fake_client)
+
+    response = client.post(
+        "/deployments",
+        json={"model": "phi3:mini", "engine": "ollama"},
+        headers=auth_headers(client),
+    )
+    deployment_id = response.json()["deployment"]["deployment_id"]
+
+    final_deployment = client.get(
+        f"/deployments/{deployment_id}",
+        headers=auth_headers(client),
+    ).json()
+
+    assert fake_client.pull_calls == []
+    assert final_deployment["status"] == "running"
+    assert final_deployment["runtime_state"] == "ollama-model-already-present"
+
+
+def test_deploy_ollama_model_pull_failure_reports_clear_error() -> None:
+    """A failed Ollama pull surfaces a useful error and does not fake success."""
+
+    fake_client = FakeOllamaRuntimeClient(
+        initial_models=(),
+        fail_pull_with=RuntimeError("no space left on device"),
+    )
+    client = create_client(ollama_client=fake_client)
+
+    response = client.post(
+        "/deployments",
+        json={"model": "phi3:mini", "engine": "ollama"},
+        headers=auth_headers(client),
+    )
+    deployment_id = response.json()["deployment"]["deployment_id"]
+    job_id = response.json()["job"]["job_id"]
+
+    final_deployment = client.get(
+        f"/deployments/{deployment_id}",
+        headers=auth_headers(client),
+    ).json()
+    final_job = client.get(f"/jobs/{job_id}").json()
+
+    assert final_deployment["status"] == "failed"
+    assert final_deployment["runtime_state"] == "ollama-pull-failed"
+    assert "phi3:mini" in final_deployment["error"]
+    assert "no space left on device" in final_deployment["error"]
+    assert final_job["status"] == "failed"
+
+
+def test_deploy_operation_exception_marks_deployment_failed() -> None:
+    """Manager exceptions do not leave deployment records stuck as deploying."""
+
+    job_repository = InMemoryJobRepository()
+    job_service = JobService(
+        queue=InMemoryJobQueue(),
+        repository=job_repository,
+    )
+    deployment_repository = InMemoryModelDeploymentRepository()
+    deployment_service = ModelDeploymentService(
+        deployments=deployment_repository,
+        manager=FailingDeploymentManager(),
+        jobs=job_service,
+        job_repository=job_repository,
+        timeout_seconds=5,
+    )
+
+    deployment, job = deployment_service.deploy(
+        model="phi3-mini",
+        engine=LLMEngine.OLLAMA,
+    )
+
+    final_job = deployment_service.execute_deploy(
+        deployment.deployment_id,
+        job.job_id,
+    )
+    final_deployment = deployment_service.get_deployment(deployment.deployment_id)
+
+    assert final_job.status.value == "failed"
+    assert final_deployment.status.value == "failed"
+    assert final_deployment.runtime_state == "operation-failed"
+    assert final_deployment.error == "runtime exploded"
 
 
 def test_deploy_vllm_without_gpu_fails_with_clear_reason() -> None:

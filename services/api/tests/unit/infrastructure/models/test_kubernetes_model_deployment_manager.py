@@ -195,17 +195,61 @@ def test_deploy_vllm_with_gpu_requests_gpu_resources() -> None:
 
     result = manager.deploy(deployment(LLMEngine.VLLM))
 
-    container = apps_api.patches[0]["body"]["spec"]["template"]["spec"]["containers"][0]
+    body = apps_api.patches[0]["body"]
+    container = body["spec"]["template"]["spec"]["containers"][0]
+
+    assert body["spec"]["strategy"] == {
+        "type": "Recreate",
+    }
+
     assert container["resources"]["requests"]["nvidia.com/gpu"] == "1"
     assert container["resources"]["limits"]["nvidia.com/gpu"] == "1"
+
     assert container["args"][:4] == [
         "--model",
         "HuggingFaceTB/SmolLM2-360M-Instruct",
         "--served-model-name",
         "smollm2-360m",
     ]
+
+    args = container["args"]
+
+    assert "--gpu-memory-utilization" in args
+
+    gpu_memory_index = args.index(
+        "--gpu-memory-utilization"
+    )
+
+    assert args[gpu_memory_index + 1] == "0.75"
+
     assert {"name": "VLLM_USE_V2_MODEL_RUNNER", "value": "0"} in container["env"]
     assert {"name": "VLLM_WSL2_ENABLE_PIN_MEMORY", "value": "1"} in container["env"]
+    assert {"name": "HF_HOME", "value": "/cache/huggingface"} in container["env"]
+    assert {"name": "XDG_CACHE_HOME", "value": "/cache"} in container["env"]
+    assert {"name": "HOME", "value": "/tmp"} in container["env"]
+
+    assert {
+        "name": "model-cache",
+        "mountPath": "/cache/huggingface",
+    } in container["volumeMounts"]
+
+    assert {
+        "name": "tmp",
+        "mountPath": "/tmp",
+    } in container["volumeMounts"]
+
+    volumes = body["spec"]["template"]["spec"]["volumes"]
+
+    assert {
+        "name": "model-cache",
+        "emptyDir": {},
+    } in volumes
+
+    assert {
+        "name": "tmp",
+        "emptyDir": {},
+    } in volumes
+
     assert apps_api.patches[0]["name"] == "model-vllm-smollm2-360m"
     assert result.status is ModelDeploymentStatus.LOADING
     assert result.runtime_state == "ready:0/1"

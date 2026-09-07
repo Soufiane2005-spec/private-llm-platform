@@ -53,4 +53,6 @@ class ModelResponse(BaseModel):
     served_model_name: str | None
     gpu_required: bool
     runtime_available: bool
+    benchmark_eligible: bool
+    deployment_status: str | None = None
     benchmark_model_id: str

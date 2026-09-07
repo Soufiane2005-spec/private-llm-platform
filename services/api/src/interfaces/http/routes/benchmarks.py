@@ -8,6 +8,7 @@ from application.services.benchmark_execution_service import BenchmarkExecutionS
 from application.services.benchmark_query_service import BenchmarkQueryService
 from application.services.job_service import JobService
 from application.services.model_catalog import ModelCatalog
+from application.services.model_runtime_availability import ModelRuntimeAvailability
 from domain.benchmarks.benchmark_record import BenchmarkRecord
 from domain.jobs.job import Job
 from infrastructure.config import get_settings
@@ -53,6 +54,12 @@ _execution_service = BenchmarkExecutionService(
         timeout_seconds=get_settings().vllm_timeout_seconds,
     ),
     resource_sampler=SystemResourceProvider(),
+    runtime_availability=ModelRuntimeAvailability(
+        ollama_base_url=get_settings().ollama_base_url,
+        vllm_base_url=get_settings().vllm_base_url,
+        timeout_seconds=2.0,
+    ),
+    timeout_seconds=get_settings().ollama_timeout_seconds,
 )
 
 

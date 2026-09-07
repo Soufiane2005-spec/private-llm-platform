@@ -1,10 +1,10 @@
 """HTTP routes for model management."""
 
 import re
+from collections.abc import Iterable
 from dataclasses import replace
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from application.services.model_catalog import (
@@ -12,7 +12,9 @@ from application.services.model_catalog import (
     ModelCatalog,
     ModelNotFoundError,
 )
-from domain.models.deployment import ModelDeploymentStatus
+from application.services.model_deployment_service import ModelDeploymentService
+from application.services.model_runtime_availability import ModelRuntimeAvailability
+from domain.models.deployment import ModelDeployment, ModelDeploymentStatus
 from domain.models.llm_engine import LLMEngine
 from domain.models.model_catalog import ModelCatalogEntry
 from infrastructure.config import get_settings
@@ -21,6 +23,7 @@ from infrastructure.persistence.factory import (
     get_persistent_model_catalog_repository,
 )
 from interfaces.http.dependencies.auth import EngineerUserDependency
+from interfaces.http.routes.deployments import get_deployment_service
 from interfaces.http.schemas.models import (
     ModelCreateRequest,
     ModelResponse,
@@ -30,6 +33,7 @@ from interfaces.http.schemas.models import (
 router = APIRouter(prefix="/models", tags=["models"])
 
 _catalog = ModelCatalog(repository=get_persistent_model_catalog_repository())
+_DEPLOYMENT_STATUS_UNSET = object()
 
 
 def get_model_catalog() -> ModelCatalog:
@@ -39,55 +43,68 @@ def get_model_catalog() -> ModelCatalog:
 
 
 ModelCatalogDependency = Annotated[ModelCatalog, Depends(get_model_catalog)]
+DeploymentServiceDependency = Annotated[
+    ModelDeploymentService,
+    Depends(get_deployment_service),
+]
 
 
-def _runtime_available(model: ModelCatalogEntry) -> bool:
+def _runtime_checker() -> ModelRuntimeAvailability:
     settings = get_settings()
-    timeout = 2.0
-    runtime_ids = {model.model_id, model.engine_model_id, model.benchmark_model_id}
+    return ModelRuntimeAvailability(
+        ollama_base_url=settings.ollama_base_url,
+        vllm_base_url=settings.vllm_base_url,
+        timeout_seconds=0.5,
+    )
 
+
+def _deployment_status(model: ModelCatalogEntry) -> str | None:
     try:
-        if any(
-            deployment.model in runtime_ids
-            and deployment.status is ModelDeploymentStatus.RUNNING
-            for deployment in get_persistent_deployment_repository().list()
-        ):
-            return True
+        deployments = get_deployment_service().list_deployments()
     except Exception:
-        pass
+        try:
+            deployments = get_persistent_deployment_repository().list()
+        except Exception:
+            return None
 
-    try:
-        if model.engine is LLMEngine.OLLAMA:
-            response = httpx.get(
-                f"{settings.ollama_base_url.rstrip('/')}/api/tags",
-                timeout=timeout,
-            )
-            response.raise_for_status()
-            body = response.json()
-            names = {
-                item.get("name")
-                for item in body.get("models", [])
-                if isinstance(item, dict)
-            }
-            return model.engine_model_id in names
-
-        response = httpx.get(
-            f"{settings.vllm_base_url.rstrip('/')}/v1/models",
-            timeout=timeout,
-        )
-        response.raise_for_status()
-        body = response.json()
-        served_models = {
-            item.get("id")
-            for item in body.get("data", [])
-            if isinstance(item, dict)
-        }
-        return model.benchmark_model_id in served_models
-    except Exception:
-        return False
+    return _deployment_status_from(model, deployments)
 
 
-def _model_response(model: ModelCatalogEntry) -> ModelResponse:
+def _deployment_status_from(
+    model: ModelCatalogEntry,
+    deployments: Iterable[ModelDeployment],
+) -> str | None:
+    runtime_ids = {
+        model.model_id,
+        model.engine_model_id,
+        model.benchmark_model_id,
+    }
+    statuses: list[str] = []
+
+    for deployment in deployments:
+        if deployment.model in runtime_ids:
+            statuses.append(deployment.status.value)
+
+    for preferred in (
+        ModelDeploymentStatus.RUNNING.value,
+        ModelDeploymentStatus.LOADING.value,
+        ModelDeploymentStatus.DEPLOYING.value,
+        ModelDeploymentStatus.FAILED.value,
+        ModelDeploymentStatus.STOPPED.value,
+    ):
+        if preferred in statuses:
+            return preferred
+
+    return None
+
+
+def _model_response(
+    model: ModelCatalogEntry,
+    runtime_checker: ModelRuntimeAvailability | None = None,
+    deployment_status: str | None | object = _DEPLOYMENT_STATUS_UNSET,
+) -> ModelResponse:
+    runtime_state = (runtime_checker or _runtime_checker()).state_for(model)
+
     return ModelResponse(
         model_id=model.model_id,
         display_name=model.display_name,
@@ -97,19 +114,63 @@ def _model_response(model: ModelCatalogEntry) -> ModelResponse:
         enabled=model.enabled,
         served_model_name=model.served_model_name,
         gpu_required=model.gpu_required,
-        runtime_available=_runtime_available(model),
+        runtime_available=runtime_state.runtime_available,
+        benchmark_eligible=runtime_state.benchmark_eligible,
+        deployment_status=(
+            _deployment_status(model)
+            if deployment_status is _DEPLOYMENT_STATUS_UNSET
+            else deployment_status
+        ),
         benchmark_model_id=model.benchmark_model_id,
     )
 
 
 @router.get("", response_model=list[ModelResponse])
-def list_models(catalog: ModelCatalogDependency) -> list[ModelResponse]:
+def list_models(
+    catalog: ModelCatalogDependency,
+    deployment_service: DeploymentServiceDependency,
+) -> list[ModelResponse]:
     """Return all models available in the platform catalog."""
 
-    return [_model_response(model) for model in catalog.list_models()]
+    runtime_checker = _runtime_checker()
+    models = catalog.list_models()
+
+    try:
+        deployments = deployment_service.list_deployments()
+    except Exception:
+        try:
+            deployments = get_persistent_deployment_repository().list()
+        except Exception:
+            deployment_statuses = {
+                model.model_id: None
+                for model in models
+            }
+        else:
+            deployment_statuses = {
+                model.model_id: _deployment_status_from(model, deployments)
+                for model in models
+            }
+    else:
+        deployment_statuses = {
+            model.model_id: _deployment_status_from(model, deployments)
+            for model in models
+        }
+
+    return [
+        _model_response(
+            model,
+            runtime_checker,
+            deployment_status=deployment_statuses[model.model_id],
+        )
+        for model in models
+    ]
 
 
-@router.post("", response_model=ModelResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ModelResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_model(
     request: ModelCreateRequest,
     _user: EngineerUserDependency,
@@ -138,9 +199,15 @@ def create_model(
     try:
         return _model_response(catalog.add(entry))
     except DuplicateModelError as exc:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 
 @router.get("/{model_id}", response_model=ModelResponse)
@@ -153,7 +220,10 @@ def get_model(
     try:
         return _model_response(catalog.get(model_id))
     except ModelNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
 
 
 @router.patch("/{model_id}", response_model=ModelResponse)
@@ -182,13 +252,23 @@ def update_model(
     try:
         current = catalog.get(model_id)
         candidate = replace(current, **kwargs)
-        _ensure_no_runtime_duplicate(candidate, catalog, ignore_model_id=model_id)
+        _ensure_no_runtime_duplicate(
+            candidate,
+            catalog,
+            ignore_model_id=model_id,
+        )
         updated = catalog.update(model_id, **kwargs)
         return _model_response(updated)
     except ModelNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
 
 @router.delete("/{model_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -202,17 +282,27 @@ def delete_model(
     try:
         model = catalog.get(model_id)
     except ModelNotFoundError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
 
     active_statuses = {
         ModelDeploymentStatus.DEPLOYING,
         ModelDeploymentStatus.LOADING,
         ModelDeploymentStatus.RUNNING,
     }
-    runtime_ids = {model.model_id, model.engine_model_id, model.benchmark_model_id}
+    runtime_ids = {
+        model.model_id,
+        model.engine_model_id,
+        model.benchmark_model_id,
+    }
 
     for deployment in get_persistent_deployment_repository().list():
-        if deployment.model in runtime_ids and deployment.status in active_statuses:
+        if (
+            deployment.model in runtime_ids
+            and deployment.status in active_statuses
+        ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Cannot delete a model with an active deployment.",
@@ -232,11 +322,13 @@ def _default_model_id(request: ModelCreateRequest) -> str:
 
 def _slugify(value: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
+
     if not slug:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="model_id could not be generated.",
         )
+
     return slug[:120]
 
 

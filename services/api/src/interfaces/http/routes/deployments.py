@@ -16,6 +16,9 @@ from infrastructure.models.kubernetes_model_deployment_manager import (
 from infrastructure.models.local_model_deployment_manager import (
     LocalModelDeploymentManager,
 )
+from infrastructure.models.routed_model_deployment_manager import (
+    RoutedModelDeploymentManager,
+)
 from infrastructure.persistence.factory import (
     get_persistent_deployment_repository,
     get_persistent_job_repository,
@@ -37,23 +40,30 @@ _job_repository = get_persistent_job_repository()
 _job_queue = InMemoryJobQueue()
 _job_service = JobService(queue=_job_queue, repository=_job_repository)
 _settings = get_settings()
-_deployment_service = ModelDeploymentService(
-    deployments=_deployment_repository,
-    manager=(
-        KubernetesModelDeploymentManager(
+_catalog = ModelCatalog(repository=get_persistent_model_catalog_repository())
+_local_deployment_manager = LocalModelDeploymentManager(
+    gpu_available=False,
+    model_catalog=_catalog,
+)
+_runtime_deployment_manager = (
+    RoutedModelDeploymentManager(
+        ollama_manager=_local_deployment_manager,
+        vllm_manager=KubernetesModelDeploymentManager(
             namespace=_settings.kubernetes_namespace,
             context=_settings.kubernetes_context,
-            model_catalog=ModelCatalog(
-                repository=get_persistent_model_catalog_repository()
-            ),
-        )
-        if _settings.model_deployment_backend == "kubernetes"
-        else LocalModelDeploymentManager(gpu_available=False)
-    ),
+            model_catalog=_catalog,
+        ),
+    )
+    if _settings.model_deployment_backend == "kubernetes"
+    else _local_deployment_manager
+)
+_deployment_service = ModelDeploymentService(
+    deployments=_deployment_repository,
+    manager=_runtime_deployment_manager,
     jobs=_job_service,
     job_repository=_job_repository,
-    model_catalog=ModelCatalog(repository=get_persistent_model_catalog_repository()),
-    timeout_seconds=_settings.model_operation_timeout_seconds,
+    model_catalog=_catalog,
+    timeout_seconds=max(_settings.model_operation_timeout_seconds, 900.0),
 )
 
 

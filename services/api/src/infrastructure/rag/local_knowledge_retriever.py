@@ -85,7 +85,10 @@ class LocalKnowledgeRetriever:
         for path in self._knowledge_files():
             content = path.read_text(encoding="utf-8")
 
-            for chunk in self._split_into_chunks(content):
+            for chunk_index, chunk in enumerate(
+                self._split_into_chunks(content),
+                start=1,
+            ):
                 chunk_tokens = self._tokenize(chunk)
 
                 if not chunk_tokens:
@@ -103,6 +106,8 @@ class LocalKnowledgeRetriever:
                         source=path.name,
                         content=chunk.strip(),
                         score=score,
+                        chunk_index=chunk_index,
+                        page=self._page_for_chunk(chunk),
                     )
                 )
 
@@ -126,11 +131,43 @@ class LocalKnowledgeRetriever:
 
     @staticmethod
     def _split_into_chunks(content: str) -> list[str]:
-        return [
+        paragraphs = [
             chunk.strip()
             for chunk in re.split(r"\n\s*\n", content)
             if chunk.strip()
         ]
+
+        chunks: list[str] = []
+        for paragraph in paragraphs:
+            if len(paragraph) <= 1200:
+                chunks.append(paragraph)
+                continue
+
+            sentences = [
+                sentence.strip()
+                for sentence in re.split(r"(?<=[.!?])\s+", paragraph)
+                if sentence.strip()
+            ]
+            current: list[str] = []
+            current_length = 0
+            for sentence in sentences or [paragraph]:
+                if current and current_length + len(sentence) > 1200:
+                    chunks.append(" ".join(current))
+                    current = []
+                    current_length = 0
+                current.append(sentence)
+                current_length += len(sentence) + 1
+            if current:
+                chunks.append(" ".join(current))
+
+        return chunks
+
+    @staticmethod
+    def _page_for_chunk(chunk: str) -> int | None:
+        match = re.search(r"\bpage\s+(\d+)\b", chunk, flags=re.IGNORECASE)
+        if not match:
+            return None
+        return int(match.group(1))
 
     @staticmethod
     def _normalize_text(text: str) -> str:

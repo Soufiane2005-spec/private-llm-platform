@@ -1,5 +1,7 @@
 """Application service for benchmark execution and persistence."""
 
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -8,6 +10,7 @@ from application.ports.benchmark_repository import BenchmarkRepository
 from application.ports.job_repository import JobRepository
 from application.services.job_service import JobService
 from application.services.model_catalog import ModelCatalog, ModelNotFoundError
+from application.services.model_runtime_availability import ModelRuntimeAvailability
 from domain.benchmarks.benchmark_record import BenchmarkRecord
 from domain.benchmarks.resource_metrics import BenchmarkResourceMetrics
 from domain.benchmarks.result import BenchmarkResult
@@ -29,7 +32,12 @@ class BenchmarkExecutionService:
         ollama_executor: BenchmarkExecutor,
         vllm_executor: BenchmarkExecutor,
         resource_sampler: object,
+        runtime_availability: ModelRuntimeAvailability | None = None,
+        timeout_seconds: float = 120.0,
     ) -> None:
+        if timeout_seconds <= 0:
+            raise ValueError("timeout_seconds must be greater than zero.")
+
         self._repository = repository
         self._jobs = jobs
         self._job_repository = job_repository
@@ -37,6 +45,8 @@ class BenchmarkExecutionService:
         self._ollama_executor = ollama_executor
         self._vllm_executor = vllm_executor
         self._resource_sampler = resource_sampler
+        self._runtime_availability = runtime_availability
+        self._timeout_seconds = timeout_seconds
 
     def run(
         self,
@@ -54,30 +64,22 @@ class BenchmarkExecutionService:
             raise ValueError("at least one prompt is required.")
 
         catalog_model = self._require_catalog_model(model, engine)
+        self._require_runtime_available(catalog_model)
         job = self._jobs.submit(f"benchmark:{engine.value}:{catalog_model.model_id}")
         job = job.mark_running().register_attempt()
         self._job_repository.save(job)
 
         try:
-            executor = self._executor_for(engine)
-            records = tuple(
-                self._run_prompt(
-                    executor=executor,
-                    runtime_model=catalog_model.benchmark_model_id,
-                    model_id=catalog_model.model_id,
-                    prompt=prompt,
-                    index=index,
-                    engine=engine,
-                )
-                for index, prompt in enumerate(prompts, start=1)
+            records = self._execute_records_with_timeout(
+                catalog_model=catalog_model,
+                engine=engine,
+                prompts=prompts,
             )
+            self._save_records(records)
         except Exception as exc:
             failed = job.mark_failed(str(exc))
             self._job_repository.save(failed)
             return (), failed
-
-        for record in records:
-            self._repository.save(record)
 
         completed = job.mark_completed()
         self._job_repository.save(completed)
@@ -94,6 +96,7 @@ class BenchmarkExecutionService:
 
         self._validate_request(model=model, prompts=prompts)
         catalog_model = self._require_catalog_model(model, engine)
+        self._require_runtime_available(catalog_model)
         return self._jobs.submit(
             f"benchmark:{engine.value}:{catalog_model.model_id}",
             enqueue=False,
@@ -111,6 +114,7 @@ class BenchmarkExecutionService:
 
         self._validate_request(model=model, prompts=prompts)
         catalog_model = self._require_catalog_model(model, engine)
+        self._require_runtime_available(catalog_model)
         job = self._job_repository.get(job_id)
 
         if job is None:
@@ -120,29 +124,76 @@ class BenchmarkExecutionService:
         self._job_repository.save(running)
 
         try:
-            executor = self._executor_for(engine)
-            records = tuple(
-                self._run_prompt(
-                    executor=executor,
-                    runtime_model=catalog_model.benchmark_model_id,
-                    model_id=catalog_model.model_id,
-                    prompt=prompt,
-                    index=index,
-                    engine=engine,
-                )
-                for index, prompt in enumerate(prompts, start=1)
+            records = self._execute_records_with_timeout(
+                catalog_model=catalog_model,
+                engine=engine,
+                prompts=prompts,
             )
+            self._save_records(records)
         except Exception as exc:
             failed = running.mark_failed(str(exc))
             self._job_repository.save(failed)
             return ()
 
-        for record in records:
-            self._repository.save(record)
-
         completed = running.mark_completed()
         self._job_repository.save(completed)
         return records
+
+    def _execute_records_with_timeout(
+        self,
+        *,
+        catalog_model: ModelCatalogEntry,
+        engine: LLMEngine,
+        prompts: tuple[str, ...],
+    ) -> tuple[BenchmarkRecord, ...]:
+        return self._execute_with_timeout(
+            lambda: self._execute_records(
+                catalog_model=catalog_model,
+                engine=engine,
+                prompts=prompts,
+            )
+        )
+
+    def _execute_records(
+        self,
+        *,
+        catalog_model: ModelCatalogEntry,
+        engine: LLMEngine,
+        prompts: tuple[str, ...],
+    ) -> tuple[BenchmarkRecord, ...]:
+        executor = self._executor_for(engine)
+        return tuple(
+            self._run_prompt(
+                executor=executor,
+                runtime_model=catalog_model.benchmark_model_id,
+                model_id=catalog_model.model_id,
+                prompt=prompt,
+                index=index,
+                engine=engine,
+            )
+            for index, prompt in enumerate(prompts, start=1)
+        )
+
+    def _execute_with_timeout(
+        self,
+        operation: Callable[[], tuple[BenchmarkRecord, ...]],
+    ) -> tuple[BenchmarkRecord, ...]:
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(operation)
+
+        try:
+            return future.result(timeout=self._timeout_seconds)
+        except TimeoutError as exc:
+            future.cancel()
+            raise TimeoutError(
+                f"Benchmark execution timed out after {self._timeout_seconds} seconds."
+            ) from exc
+        finally:
+            executor.shutdown(wait=False, cancel_futures=True)
+
+    def _save_records(self, records: tuple[BenchmarkRecord, ...]) -> None:
+        for record in records:
+            self._repository.save(record)
 
     def _executor_for(self, engine: LLMEngine) -> BenchmarkExecutor:
         if engine is LLMEngine.OLLAMA:
@@ -173,6 +224,12 @@ class BenchmarkExecutionService:
             raise ValueError(f"Model '{model_id}' is disabled.")
 
         return model
+
+    def _require_runtime_available(self, model: ModelCatalogEntry) -> None:
+        if self._runtime_availability is None:
+            return
+
+        self._runtime_availability.require_benchmark_eligible(model)
 
     @staticmethod
     def _validate_request(*, model: str, prompts: tuple[str, ...]) -> None:

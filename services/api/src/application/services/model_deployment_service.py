@@ -139,6 +139,7 @@ class ModelDeploymentService:
             job_id,
             lambda: self._manager.deploy(deployment),
             save_deployment=True,
+            failure_deployment_id=deployment_id,
         )
 
     def execute_start(self, deployment_id: str, job_id: str) -> Job:
@@ -149,6 +150,7 @@ class ModelDeploymentService:
             job_id,
             lambda: self._manager.start(deployment),
             save_deployment=True,
+            failure_deployment_id=deployment_id,
         )
 
     def execute_stop(self, deployment_id: str, job_id: str) -> Job:
@@ -159,6 +161,7 @@ class ModelDeploymentService:
             job_id,
             lambda: self._manager.stop(deployment),
             save_deployment=True,
+            failure_deployment_id=deployment_id,
         )
 
     def execute_restart(self, deployment_id: str, job_id: str) -> Job:
@@ -169,6 +172,7 @@ class ModelDeploymentService:
             job_id,
             lambda: self._manager.restart(deployment),
             save_deployment=True,
+            failure_deployment_id=deployment_id,
         )
 
     def execute_delete(self, deployment_id: str, job_id: str) -> Job:
@@ -191,6 +195,7 @@ class ModelDeploymentService:
         operation: Callable[[], ModelDeployment | None],
         *,
         save_deployment: bool,
+        failure_deployment_id: str | None = None,
     ) -> Job:
         job = self._require_job(job_id)
 
@@ -213,6 +218,12 @@ class ModelDeploymentService:
                     self._job_repository.save(job)
                     continue
 
+                if save_deployment and failure_deployment_id is not None:
+                    self._mark_deployment_failed(
+                        failure_deployment_id,
+                        error=str(exc),
+                    )
+
                 failed = running.mark_failed(str(exc))
                 self._job_repository.save(failed)
                 return failed
@@ -230,6 +241,23 @@ class ModelDeploymentService:
             raise KeyError("Deployment not found.")
 
         return deployment
+
+    def _mark_deployment_failed(self, deployment_id: str, *, error: str) -> None:
+        deployment = self._deployments.get(deployment_id)
+
+        if deployment is None:
+            return
+
+        if deployment.status is ModelDeploymentStatus.FAILED:
+            return
+
+        failed = deployment.with_status(
+            ModelDeploymentStatus.FAILED,
+            runtime_state="operation-failed",
+            error=error,
+            gpu_available=deployment.gpu_available,
+        )
+        self._deployments.save(failed)
 
     def _refresh_status(self, deployment: ModelDeployment) -> ModelDeployment:
         if deployment.runtime_state in {

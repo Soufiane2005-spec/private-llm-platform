@@ -7,7 +7,12 @@ from application.ports.dead_letter_queue import DeadLetterQueue
 from application.ports.job_queue import JobQueue
 from application.ports.job_repository import JobRepository
 from application.services.job_worker import JobWorker
-from domain.jobs.job import Job
+from domain.jobs.job import Job, JobStatus
+
+ORPHANED_RUNNING_JOB_ERROR = (
+    "Job was running when the API process started; background task execution "
+    "is not durable and cannot be resumed."
+)
 
 
 def _default_job_handler(job: Job) -> None:
@@ -104,3 +109,28 @@ class JobService:
         )
 
         return worker.run_once()
+
+
+def fail_orphaned_running_jobs(
+    repository: JobRepository,
+    *,
+    error: str = ORPHANED_RUNNING_JOB_ERROR,
+) -> tuple[Job, ...]:
+    """Mark persisted running jobs as failed after process startup.
+
+    FastAPI background tasks live inside the API process. If a job is still
+    marked running when a new process starts, there is no worker state to
+    resume, so keeping it running forever is misleading.
+    """
+
+    failed_jobs: list[Job] = []
+
+    for job in repository.list():
+        if job.status is not JobStatus.RUNNING:
+            continue
+
+        failed = job.mark_failed(error)
+        repository.save(failed)
+        failed_jobs.append(failed)
+
+    return tuple(failed_jobs)

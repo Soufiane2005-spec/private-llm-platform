@@ -8,6 +8,7 @@ from time import perf_counter
 import httpx
 
 from application.ports.benchmark_executor import BenchmarkExecution, BenchmarkExecutor
+from application.services.ollama_model_names import ollama_models_match
 
 
 class OllamaBenchmarkError(RuntimeError):
@@ -157,7 +158,11 @@ class OllamaBenchmarkExecutor(BenchmarkExecutor):
             if isinstance(item, dict)
         }
 
-        if model not in models:
+        if not any(
+            ollama_models_match(model, runtime_name)
+            for runtime_name in models
+            if runtime_name
+        ):
             available = ", ".join(sorted(name for name in models if name))
             suffix = f" Available models: {available}." if available else ""
             raise OllamaBenchmarkError(f"Model not available in Ollama: {model}.{suffix}")
