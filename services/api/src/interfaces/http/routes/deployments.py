@@ -6,7 +6,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from application.services.job_service import JobService
 from application.services.model_catalog import ModelCatalog
-from application.services.model_deployment_service import ModelDeploymentService
+from application.services.model_deployment_service import (
+    ModelDeploymentService,
+    SingleActiveVllmError,
+)
 from domain.jobs.job import Job
 from domain.models.deployment import ModelDeployment
 from infrastructure.config import get_settings
@@ -140,6 +143,8 @@ def deploy_model(
             model=request.model,
             engine=request.engine,
         )
+    except SingleActiveVllmError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -181,6 +186,8 @@ def start_deployment(
         deployment, job = service.start(deployment_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Deployment not found.") from exc
+    except SingleActiveVllmError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     background_tasks.add_task(service.execute_start, deployment_id, job.job_id)
 
@@ -219,6 +226,8 @@ def restart_deployment(
         deployment, job = service.restart(deployment_id)
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="Deployment not found.") from exc
+    except SingleActiveVllmError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     background_tasks.add_task(service.execute_restart, deployment_id, job.job_id)
 

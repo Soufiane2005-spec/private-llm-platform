@@ -308,7 +308,10 @@ function App() {
     const activeToken = token
 
     async function refreshDeployments() {
-      await loadDeployments(activeToken)
+      await Promise.all([
+        loadDeployments(activeToken),
+        loadModels(),
+      ])
     }
 
     void refreshDeployments()
@@ -317,7 +320,7 @@ function App() {
     }, 5000)
 
     return () => window.clearInterval(interval)
-  }, [loadDeployments, token])
+  }, [loadDeployments, loadModels, token])
 
   async function handleLogin(username: string, password: string) {
     setLoginError(null)
@@ -821,6 +824,18 @@ function ModelsView({
   onDeleteModel,
 }: ModelsViewProps) {
   const canOperate = user?.role === 'admin' || user?.role === 'engineer'
+
+  const activeVllmDeployment = deployments.find(
+    (deployment) =>
+      deployment.engine === 'vllm' &&
+      ['deploying', 'loading', 'running'].includes(deployment.status),
+  )
+
+  const isVllmDeploymentBlocked = (model: ModelCatalogEntry) =>
+    model.engine === 'vllm' &&
+    activeVllmDeployment !== undefined &&
+    activeVllmDeployment.model !== model.model_id
+
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null)
   const [editingModel, setEditingModel] = useState<ModelCatalogEntry | null>(
     null,
@@ -939,6 +954,13 @@ function ModelsView({
                   </div>
                 </dl>
 
+                {isVllmDeploymentBlocked(model) && (
+                  <p className="form-note">
+                    Another vLLM model is already active. Stop it before
+                    deploying this model.
+                  </p>
+                )}
+
                 {canOperate && (
                   <div className="model-actions">
                     <button
@@ -979,12 +1001,22 @@ function ModelsView({
                     <button
                       type="button"
                       className="action-button"
-                      disabled={action === `deploy-${model.model_id}`}
+                      disabled={
+                        action === `deploy-${model.model_id}` ||
+                        isVllmDeploymentBlocked(model)
+                      }
+                      title={
+                        isVllmDeploymentBlocked(model)
+                          ? 'Another vLLM model is already active. Stop it before deploying this model.'
+                          : undefined
+                      }
                       onClick={() => onDeploy(model)}
                     >
                       {action === `deploy-${model.model_id}`
                         ? 'Deploying'
-                        : 'Deploy'}
+                        : isVllmDeploymentBlocked(model)
+                          ? 'vLLM active'
+                          : 'Deploy'}
                     </button>
                   </div>
                 )}

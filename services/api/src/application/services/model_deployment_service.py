@@ -19,8 +19,18 @@ class ModelDeploymentJobTimeoutError(RuntimeError):
     """Raised when a deployment job exceeds its timeout."""
 
 
+class SingleActiveVllmError(RuntimeError):
+    """Raised when another vLLM deployment already owns the GPU."""
+
+
 class ModelDeploymentService:
     """Coordinate model deployment persistence, jobs, and runtime changes."""
+
+    _ACTIVE_VLLM_STATUSES = {
+        ModelDeploymentStatus.DEPLOYING,
+        ModelDeploymentStatus.LOADING,
+        ModelDeploymentStatus.RUNNING,
+    }
 
     def __init__(
         self,
@@ -59,6 +69,10 @@ class ModelDeploymentService:
         """Create a deployment and submit its asynchronous deployment job."""
 
         catalog_entry = self._catalog_entry_for(model, engine)
+
+        if engine is LLMEngine.VLLM:
+            self._ensure_single_active_vllm()
+
         deployment = ModelDeployment(
             deployment_id=str(uuid4()),
             model=catalog_entry.model_id if catalog_entry is not None else model.strip(),
@@ -77,6 +91,12 @@ class ModelDeploymentService:
         """Submit an asynchronous deployment start job."""
 
         deployment = self._require_deployment(deployment_id)
+
+        if deployment.engine is LLMEngine.VLLM:
+            self._ensure_single_active_vllm(
+                exclude_deployment_id=deployment_id,
+            )
+
         pending = deployment.with_status(
             ModelDeploymentStatus.LOADING,
             runtime_state="start-job-submitted",
@@ -107,6 +127,12 @@ class ModelDeploymentService:
         """Submit an asynchronous deployment restart job."""
 
         deployment = self._require_deployment(deployment_id)
+
+        if deployment.engine is LLMEngine.VLLM:
+            self._ensure_single_active_vllm(
+                exclude_deployment_id=deployment_id,
+            )
+
         pending = deployment.with_status(
             ModelDeploymentStatus.LOADING,
             runtime_state="restart-job-submitted",
@@ -241,6 +267,29 @@ class ModelDeploymentService:
             raise KeyError("Deployment not found.")
 
         return deployment
+
+    def _ensure_single_active_vllm(
+        self,
+        *,
+        exclude_deployment_id: str | None = None,
+    ) -> None:
+        """Ensure that no other vLLM deployment currently owns the GPU."""
+
+        for deployment in self._deployments.list():
+            if deployment.engine is not LLMEngine.VLLM:
+                continue
+
+            if (
+                exclude_deployment_id is not None
+                and deployment.deployment_id == exclude_deployment_id
+            ):
+                continue
+
+            if deployment.status in self._ACTIVE_VLLM_STATUSES:
+                raise SingleActiveVllmError(
+                    "Another vLLM model is already active. "
+                    "Stop it before deploying this model."
+                )
 
     def _mark_deployment_failed(self, deployment_id: str, *, error: str) -> None:
         deployment = self._deployments.get(deployment_id)
