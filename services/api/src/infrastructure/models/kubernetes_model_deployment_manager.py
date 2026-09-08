@@ -127,7 +127,11 @@ class KubernetesModelDeploymentManager:
         return self._status_from_kubernetes(deployment)
 
     def delete(self, deployment: ModelDeployment) -> None:
-        """Delete the Kubernetes Deployment for the model."""
+        """Delete Kubernetes resources for the model.
+
+        Deletion is idempotent: resources that are already absent are treated
+        as successfully deleted.
+        """
 
         try:
             self._apps_api.delete_namespaced_deployment(
@@ -135,9 +139,10 @@ class KubernetesModelDeploymentManager:
                 namespace=self._namespace,
             )
         except Exception as exc:
-            raise KubernetesModelDeploymentError(
-                "Unable to delete Kubernetes model deployment."
-            ) from exc
+            if not self._is_not_found_error(exc):
+                raise KubernetesModelDeploymentError(
+                    "Unable to delete Kubernetes model deployment."
+                ) from exc
 
         if deployment.engine is LLMEngine.VLLM:
             try:
