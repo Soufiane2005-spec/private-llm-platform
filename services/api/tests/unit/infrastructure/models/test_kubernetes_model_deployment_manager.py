@@ -75,6 +75,9 @@ class FakeAppsApi:
         )
 
     def delete_namespaced_deployment(self, *, name: str, namespace: str) -> None:
+        if not self.exists:
+            raise NotFoundError
+
         self.deleted.append(f"{namespace}/{name}")
 
 
@@ -289,3 +292,23 @@ def test_restart_patches_rollout_annotation() -> None:
     ]
     assert "kubectl.kubernetes.io/restartedAt" in annotations
     assert result.status is ModelDeploymentStatus.RUNNING
+
+
+def test_delete_missing_vllm_resources_is_idempotent() -> None:
+    """Deleting already absent Kubernetes resources succeeds."""
+
+    apps_api = FakeAppsApi(exists=False)
+    core_api = FakeCoreApi(gpu="1")
+    manager = KubernetesModelDeploymentManager(
+        namespace="llm-platform",
+        apps_api=apps_api,
+        core_api=core_api,
+        model_catalog=model_catalog(),
+    )
+
+    manager.delete(deployment(LLMEngine.VLLM))
+
+    assert apps_api.deleted == []
+    assert core_api.deleted_services == [
+        "llm-platform/model-vllm-smollm2-360m"
+    ]
