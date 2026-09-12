@@ -1,0 +1,51 @@
+﻿projet_id,zone,type_projet,surface_ha,beneficiaires_estimes,avancement_percent,statut,service_responsable,nature_donnees
+IRR-2026-001,Tinghir,Irrigation localisée,425,185,84,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-002,Tinghir,Modernisation réseau,362,235,88,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-003,Zagora,Pompage,348,323,93,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-004,Skoura,Pompage,201,218,45,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-005,Boumalne-Dadès,Modernisation réseau,609,415,36,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-006,Skoura,Pompage,856,417,55,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-007,Ouarzazate,Économie d'eau,224,318,74,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-008,Boumalne-Dadès,Économie d'eau,47,387,64,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-009,Zagora,Modernisation réseau,836,164,93,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-010,Skoura,Modernisation réseau,162,339,43,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-011,Tinghir,Réhabilitation de canal,752,231,53,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-012,Skoura,Économie d'eau,510,313,56,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-013,Agdz,Modernisation réseau,576,33,51,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-014,Agdz,Économie d'eau,673,58,18,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-015,Boumalne-Dadès,Pompage,190,346,83,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-016,Agdz,Modernisation réseau,790,184,60,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-017,Ouarzazate,Irrigation localisée,284,128,70,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-018,Agdz,Économie d'eau,614,367,78,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-019,Skoura,Pompage,420,252,91,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-020,Boumalne-Dadès,Économie d'eau,174,191,8,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-021,Ouarzazate,Pompage,445,58,19,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-022,Zagora,Pompage,339,190,63,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-023,Agdz,Modernisation réseau,376,258,17,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-024,Boumalne-Dadès,Modernisation réseau,346,49,43,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-025,Boumalne-Dadès,Irrigation localisée,43,449,48,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-026,Ouarzazate,Réhabilitation de canal,778,139,71,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-027,Agdz,Réhabilitation de canal,358,301,59,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-028,Zagora,Modernisation réseau,664,109,28,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-029,Boumalne-Dadès,Modernisation réseau,425,29,99,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-030,Zagora,Modernisation réseau,626,234,54,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-031,Boumalne-Dadès,Réhabilitation de canal,230,157,95,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-032,Agdz,Irrigation localisée,838,289,28,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-033,Tinghir,Réhabilitation de canal,488,73,38,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-034,Skoura,Économie d'eau,674,175,81,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-035,Agdz,Modernisation réseau,621,73,49,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-036,Skoura,Économie d'eau,196,431,91,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-037,Tinghir,Économie d'eau,624,58,91,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-038,Tinghir,Irrigation localisée,264,171,19,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-039,Tinghir,Réhabilitation de canal,543,213,58,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-040,Zagora,Économie d'eau,412,231,28,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-041,Boumalne-Dadès,Économie d'eau,730,345,27,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-042,Zagora,Modernisation réseau,315,86,28,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-043,Skoura,Économie d'eau,74,198,6,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-044,Zagora,Réhabilitation de canal,854,211,76,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-045,Boumalne-Dadès,Modernisation réseau,438,365,67,En cours,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-046,Boumalne-Dadès,Modernisation réseau,520,100,15,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-047,Ouarzazate,Réhabilitation de canal,319,31,40,En étude,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-048,Agdz,Pompage,192,414,63,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-049,Boumalne-Dadès,Modernisation réseau,582,276,19,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+IRR-2026-050,Ouarzazate,Pompage,813,293,51,Achevé,Service irrigation,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE

@@ -1,0 +1,25 @@
+INSTALLATION DU PACK DE DEMONSTRATION
+
+1) Dans votre projet, ouvrez :
+services\api\data\knowledge
+
+2) Désactivez les anciens fichiers demo_*.md, par exemple :
+ren demo_faq.md demo_faq.md.disabled
+ren demo_irrigation.md demo_irrigation.md.disabled
+ren demo_procedures.md demo_procedures.md.disabled
+
+3) Copiez TOUS les fichiers de ce pack dans :
+services\api\data\knowledge
+
+4) Votre retriever doit supporter .md, .txt et .csv.
+Si vous utilisez l'ancienne version qui ne supporte que .md/.txt,
+les fichiers CSV ne seront pas lus.
+
+5) Redémarrez le backend FastAPI.
+
+6) Rafraîchissez le frontend avec CTRL+F5.
+
+IMPORTANT :
+Les données de marchés, fournisseurs, bons de commande et projets d'irrigation
+contenues dans ce pack sont SYNTHETIQUES et NON OFFICIELLES.
+Elles servent uniquement à démontrer les capacités RAG.

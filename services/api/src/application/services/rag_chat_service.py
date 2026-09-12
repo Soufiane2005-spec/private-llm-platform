@@ -7,13 +7,20 @@ from application.ports.knowledge_retriever import (
     KnowledgeMatch,
     KnowledgeRetriever,
 )
-from application.services.model_catalog import ModelCatalog, ModelNotFoundError
-from application.services.model_runtime_availability import ModelRuntimeAvailability
+from application.services.model_catalog import (
+    ModelCatalog,
+    ModelNotFoundError,
+)
+from application.services.model_runtime_availability import (
+    ModelRuntimeAvailability,
+)
 from domain.models.llm_engine import LLMEngine
 from domain.models.model_catalog import ModelCatalogEntry
 
+
 NO_INFORMATION_REPLY = (
-    "Je n’ai pas trouvé cette information dans la documentation disponible."
+    "Je n'ai pas trouvé cette information "
+    "dans la documentation disponible."
 )
 
 
@@ -60,7 +67,12 @@ class RagChatService:
             raise ValueError("message cannot be empty.")
 
         catalog_model = self._resolve_model(clean_model)
-        runtime_model = catalog_model.engine_model_id if catalog_model else clean_model
+
+        runtime_model = (
+            catalog_model.engine_model_id
+            if catalog_model
+            else clean_model
+        )
 
         matches = self._knowledge_retriever.search(
             clean_message,
@@ -90,7 +102,10 @@ class RagChatService:
             model=runtime_model,
         )
 
-    def _resolve_model(self, model: str) -> ModelCatalogEntry | None:
+    def _resolve_model(
+        self,
+        model: str,
+    ) -> ModelCatalogEntry | None:
         if self._model_catalog is None:
             return None
 
@@ -98,24 +113,38 @@ class RagChatService:
 
         if catalog_model.engine is not LLMEngine.OLLAMA:
             raise ValueError(
-                f"Chat generation is not configured for {catalog_model.engine.value}."
+                "Chat generation is not configured for "
+                f"{catalog_model.engine.value}."
             )
 
         if not catalog_model.enabled:
-            raise ValueError(f"Model '{catalog_model.model_id}' is disabled.")
+            raise ValueError(
+                f"Model '{catalog_model.model_id}' is disabled."
+            )
 
         if self._runtime_availability is not None:
-            state = self._runtime_availability.state_for(catalog_model)
+            state = self._runtime_availability.state_for(
+                catalog_model
+            )
+
             if not state.runtime_available:
-                detail = state.reason or "runtime is unavailable"
+                detail = (
+                    state.reason
+                    or "runtime is unavailable"
+                )
+
                 raise ValueError(
-                    f"Model '{catalog_model.model_id}' is not runtime available: "
+                    f"Model '{catalog_model.model_id}' "
+                    "is not runtime available: "
                     f"{detail}."
                 )
 
         return catalog_model
 
-    def _find_catalog_model(self, model: str) -> ModelCatalogEntry:
+    def _find_catalog_model(
+        self,
+        model: str,
+    ) -> ModelCatalogEntry:
         assert self._model_catalog is not None
 
         for entry in self._model_catalog.list_models():
@@ -124,13 +153,17 @@ class RagChatService:
                 entry.engine_model_id,
                 entry.benchmark_model_id,
             }
+
             if model in identifiers:
                 return entry
 
         try:
             return self._model_catalog.get(model)
+
         except ModelNotFoundError as exc:
-            raise ValueError(f"Model '{model}' was not found in the catalog.") from exc
+            raise ValueError(
+                f"Model '{model}' was not found in the catalog."
+            ) from exc
 
     @staticmethod
     def _build_prompt(
@@ -145,29 +178,28 @@ class RagChatService:
             start=1,
         ):
             location = (
-                f"{match.source} page {match.page}"
+                f"{match.source}, page {match.page}"
                 if match.page is not None
                 else match.source
             )
+
             context_sections.append(
-                f"[Source {index}: {location}; score={match.score:.3f}]\n"
-                f"{match.content[:1200]}"
+                f"Source {index} - {location}\n"
+                f"{match.content[:900]}"
             )
 
         context = "\n\n".join(context_sections)
 
         return (
-            "Tu es un assistant privé destiné à répondre à partir "
-            "d’une documentation interne.\n\n"
-            "RÈGLES IMPORTANTES :\n"
-            "- Réponds uniquement à partir du contexte fourni.\n"
-            "- N’invente aucune procédure ou information.\n"
-            "- Si le contexte ne permet pas de répondre, dis clairement "
-            "que l’information n’est pas disponible.\n"
-            "- Réponds en français de manière claire et concise.\n"
-            "- Les documents de démonstration ne sont pas des procédures "
-            "officielles.\n\n"
-            f"CONTEXTE :\n{context}\n\n"
-            f"QUESTION :\n{question}\n\n"
-            "RÉPONSE :"
+            "CONTEXTE DOCUMENTAIRE\n"
+            "---------------------\n"
+            f"{context}\n\n"
+            "QUESTION\n"
+            "--------\n"
+            f"{question}\n\n"
+            "INSTRUCTION\n"
+            "-----------\n"
+            "Donne uniquement une réponse finale courte, "
+            "claire et professionnelle en français. "
+            "Ne reproduis pas le contexte ni les instructions."
         )

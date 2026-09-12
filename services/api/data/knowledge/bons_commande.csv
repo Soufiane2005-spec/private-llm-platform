@@ -1,0 +1,101 @@
+﻿type_document,numero,date,objet,service_responsable,fournisseur,montant_mad,statut,nature_donnees
+bon de commande,BC-2026-001,2026-03-22,Fourniture de consommables informatiques,Service irrigation,Aqua Démo Engineering,56000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-002,2026-08-11,Achat de pièces de maintenance,Service maintenance,Agri Démo Maroc 2,60000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-003,2026-09-25,Prestations de transport local,Service des marchés,Build Démo Plus 2,43000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-004,2026-04-18,Prestations de maintenance légère,Service développement agricole,Atlas Démo Services 2,142000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-005,2026-06-06,Achat de matériel de terrain,Service logistique,Palmier Démo Logistique 2,147000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-006,2026-05-20,Achat de pièces de maintenance,Service informatique,Réseau Démo Technologies 2,79000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-007,2026-05-08,Fourniture de petit matériel de bureau,Service informatique,Build Démo Plus,133000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-008,2026-08-12,Prestations de maintenance légère,Service études,Aqua Démo Engineering 2,81000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-009,2026-09-13,Prestations de transport local,Service logistique,Nomad Démo Transport 3,45000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-010,2026-01-10,Fourniture de consommables informatiques,Service logistique,Sud Démo Informatique 3,121000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-011,2026-05-24,Achat de pièces de maintenance,Service informatique,Réseau Démo Technologies 2,145000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-012,2026-09-23,Achat de pièces de maintenance,Service irrigation,Nomad Démo Transport,165000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-013,2026-04-08,Prestations de maintenance légère,Service informatique,Oasis Démo Ingénierie,171000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-014,2026-01-04,Fourniture de petit matériel de bureau,Service développement agricole,Agri Démo Maroc 2,33000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-015,2026-03-01,Achat de pièces de maintenance,Service maintenance,Aqua Démo Engineering 2,175000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-016,2026-08-21,Fourniture de petit matériel de bureau,Service logistique,Green Démo Agriculture,81000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-017,2026-01-25,Prestations de maintenance légère,Service informatique,Sud Démo Informatique,144000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-018,2026-01-06,Achat de pièces de maintenance,Service des marchés,Agri Démo Maroc 2,109000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-019,2026-03-24,Fourniture de petit matériel de bureau,Service des marchés,Aqua Démo Engineering 3,10000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-020,2026-02-11,Prestations de transport local,Service développement agricole,Data Démo Maroc,42000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-021,2026-08-09,Fourniture de consommables informatiques,Service logistique,Green Démo Agriculture,49000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-022,2026-08-21,Prestations de maintenance légère,Service équipements,Terroir Démo Services,11000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-023,2026-06-10,Prestations de maintenance légère,Service informatique,Terroir Démo Services 2,52000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-024,2026-07-14,Fourniture de petit matériel de bureau,Service irrigation,Green Démo Agriculture 2,110000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-025,2026-02-06,Prestations de transport local,Service logistique,Kasbah Démo Construction,71000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-026,2026-05-13,Prestations de transport local,Service études,Aqua Démo Engineering,92000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-027,2026-01-09,Fourniture de petit matériel de bureau,Service informatique,Drâa Démo Travaux 3,23000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-028,2026-02-15,Achat de pièces de maintenance,Service maintenance,Build Démo Plus,136000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-029,2026-05-23,Prestations de maintenance légère,Service études,Hydro Démo Conseil,102000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-030,2026-04-08,Prestations de transport local,Service équipements,Kasbah Démo Construction,124000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-031,2026-06-14,Achat de matériel de terrain,Service développement agricole,Tafilalet Démo Solutions 3,145000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-032,2026-04-25,Prestations de maintenance légère,Service irrigation,Aqua Démo Engineering,142000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-033,2026-09-23,Fourniture de consommables informatiques,Service irrigation,Oasis Démo Ingénierie 2,23000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-034,2026-09-07,Achat de matériel de terrain,Service équipements,Terroir Démo Services 2,50000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-035,2026-09-15,Prestations de maintenance légère,Service informatique,Hydro Démo Conseil,157000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-036,2026-02-17,Fourniture de consommables informatiques,Service développement agricole,Kasbah Démo Construction 2,41000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-037,2026-07-15,Fourniture de consommables informatiques,Service développement agricole,Terroir Démo Services 2,86000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-038,2026-01-13,Fourniture de consommables informatiques,Service informatique,Terroir Démo Services,156000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-039,2026-01-14,Prestations de maintenance légère,Service irrigation,Sahara Démo Équipements 2,146000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-040,2026-02-16,Fourniture de petit matériel de bureau,Service maintenance,Sahara Démo Équipements,54000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-041,2026-07-12,Prestations de transport local,Service développement agricole,Nomad Démo Transport 3,104000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-042,2026-02-22,Achat de matériel de terrain,Service équipements,Sahara Démo Équipements 3,175000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-043,2026-02-06,Prestations de transport local,Service équipements,Smart Démo Systems 2,65000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-044,2026-01-10,Prestations de maintenance légère,Service maintenance,Palmier Démo Logistique 2,144000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-045,2026-04-08,Fourniture de petit matériel de bureau,Service équipements,Palmier Démo Logistique 2,78000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-046,2026-02-02,Prestations de maintenance légère,Service maintenance,Valley Démo Maintenance 3,165000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-047,2026-04-07,Fourniture de consommables informatiques,Service des marchés,Tafilalet Démo Solutions,122000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-048,2026-01-08,Fourniture de consommables informatiques,Service maintenance,Hydro Démo Conseil 3,120000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-049,2026-09-07,Fourniture de consommables informatiques,Service équipements,Kasbah Démo Construction 3,136000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-050,2026-04-24,Fourniture de petit matériel de bureau,Service logistique,Terroir Démo Services 2,68000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-051,2026-03-22,Achat de pièces de maintenance,Service maintenance,Infra Démo Sud 2,84000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-052,2026-01-18,Prestations de maintenance légère,Service équipements,Nomad Démo Transport 2,168000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-053,2026-07-18,Fourniture de consommables informatiques,Service logistique,Valley Démo Maintenance 2,172000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-054,2026-07-17,Prestations de maintenance légère,Service maintenance,Atlas Démo Services 2,112000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-055,2026-05-13,Achat de matériel de terrain,Service développement agricole,Valley Démo Maintenance,69000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-056,2026-05-23,Prestations de transport local,Service des marchés,Palmier Démo Logistique,151000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-057,2026-07-18,Achat de pièces de maintenance,Service maintenance,Infra Démo Sud 2,70000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-058,2026-04-11,Fourniture de consommables informatiques,Service développement agricole,Drâa Démo Travaux 3,102000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-059,2026-09-24,Achat de pièces de maintenance,Service des marchés,Infra Démo Sud 3,76000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-060,2026-01-03,Achat de matériel de terrain,Service informatique,Green Démo Agriculture,130000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-061,2026-06-10,Fourniture de consommables informatiques,Service informatique,Data Démo Maroc 3,56000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-062,2026-02-24,Prestations de transport local,Service informatique,Kasbah Démo Construction 3,162000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-063,2026-04-13,Achat de pièces de maintenance,Service logistique,Data Démo Maroc 3,80000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-064,2026-08-18,Fourniture de petit matériel de bureau,Service études,Drâa Démo Travaux 3,74000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-065,2026-09-16,Fourniture de consommables informatiques,Service développement agricole,Palmier Démo Logistique 2,89000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-066,2026-06-11,Fourniture de consommables informatiques,Service informatique,Agri Démo Maroc 2,45000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-067,2026-05-18,Achat de matériel de terrain,Service maintenance,Build Démo Plus 3,83000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-068,2026-04-11,Prestations de transport local,Service informatique,Smart Démo Systems,135000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-069,2026-06-09,Prestations de transport local,Service développement agricole,Kasbah Démo Construction 3,125000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-070,2026-06-06,Prestations de maintenance légère,Service développement agricole,Kasbah Démo Construction,55000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-071,2026-01-17,Fourniture de consommables informatiques,Service des marchés,Sahara Démo Équipements,9000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-072,2026-03-21,Fourniture de consommables informatiques,Service équipements,Smart Démo Systems,10000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-073,2026-09-15,Fourniture de consommables informatiques,Service développement agricole,Oasis Démo Ingénierie 2,176000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-074,2026-01-01,Achat de matériel de terrain,Service maintenance,Smart Démo Systems 2,11000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-075,2026-09-24,Achat de matériel de terrain,Service études,Nomad Démo Transport,12000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-076,2026-07-06,Fourniture de consommables informatiques,Service équipements,Agri Démo Maroc,69000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-077,2026-09-09,Fourniture de petit matériel de bureau,Service études,Green Démo Agriculture 3,109000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-078,2026-06-13,Achat de matériel de terrain,Service informatique,Palmier Démo Logistique 2,65000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-079,2026-02-21,Prestations de maintenance légère,Service des marchés,Smart Démo Systems 3,31000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-080,2026-07-13,Prestations de transport local,Service des marchés,Aqua Démo Engineering 2,171000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-081,2026-03-03,Prestations de transport local,Service logistique,Valley Démo Maintenance 2,152000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-082,2026-09-02,Achat de pièces de maintenance,Service développement agricole,Smart Démo Systems,77000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-083,2026-02-22,Fourniture de petit matériel de bureau,Service des marchés,Build Démo Plus 3,53000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-084,2026-01-07,Achat de pièces de maintenance,Service maintenance,Nomad Démo Transport 2,27000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-085,2026-03-19,Achat de matériel de terrain,Service maintenance,Aqua Démo Engineering,146000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-086,2026-07-25,Achat de pièces de maintenance,Service irrigation,Hydro Démo Conseil 3,136000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-087,2026-06-02,Prestations de transport local,Service informatique,Agri Démo Maroc,27000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-088,2026-07-25,Fourniture de consommables informatiques,Service études,Atlas Démo Services 2,123000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-089,2026-04-12,Prestations de transport local,Service maintenance,Aqua Démo Engineering 2,55000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-090,2026-07-03,Achat de matériel de terrain,Service études,Palmier Démo Logistique 3,71000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-091,2026-02-03,Achat de pièces de maintenance,Service maintenance,Nomad Démo Transport,170000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-092,2026-07-11,Fourniture de consommables informatiques,Service irrigation,Oasis Démo Ingénierie 2,9000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-093,2026-08-12,Fourniture de petit matériel de bureau,Service irrigation,Kasbah Démo Construction 3,41000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-094,2026-03-14,Achat de matériel de terrain,Service maintenance,Kasbah Démo Construction 2,34000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-095,2026-02-12,Fourniture de consommables informatiques,Service logistique,Aqua Démo Engineering 2,106000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-096,2026-05-14,Fourniture de consommables informatiques,Service informatique,Tafilalet Démo Solutions 2,154000,Réception partielle,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-097,2026-03-22,Achat de pièces de maintenance,Service équipements,Tafilalet Démo Solutions 2,76000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-098,2026-05-16,Fourniture de consommables informatiques,Service équipements,Palmier Démo Logistique,119000,En cours,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-099,2026-07-10,Fourniture de consommables informatiques,Service logistique,Réseau Démo Technologies 2,72000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE
+bon de commande,BC-2026-100,2026-08-20,Achat de pièces de maintenance,Service développement agricole,Build Démo Plus 2,35000,Livré,SYNTHETIQUE_DEMONSTRATION_NON_OFFICIELLE

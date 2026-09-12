@@ -1,0 +1,61 @@
+﻿fournisseur_id,raison_sociale,ville,specialite,statut_demo,nature_donnees
+FOUR-001,Atlas Démo Services,Boumalne-Dadès,Travaux hydrauliques,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-002,Drâa Démo Travaux,Ouarzazate,Maintenance,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-003,Sahara Démo Équipements,Zagora,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-004,Oasis Démo Ingénierie,Zagora,Travaux hydrauliques,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-005,Tafilalet Démo Solutions,Boumalne-Dadès,Travaux hydrauliques,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-006,Sud Démo Informatique,Agdz,Logistique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-007,Agri Démo Maroc,Ouarzazate,Irrigation,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-008,Hydro Démo Conseil,Ouarzazate,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-009,Kasbah Démo Construction,Zagora,Irrigation,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-010,Palmier Démo Logistique,Agdz,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-011,Réseau Démo Technologies,Boumalne-Dadès,Logistique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-012,Valley Démo Maintenance,Zagora,Aménagement rural,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-013,Green Démo Agriculture,Agdz,Maintenance,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-014,Infra Démo Sud,Ouarzazate,Équipements agricoles,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-015,Smart Démo Systems,Boumalne-Dadès,Logistique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-016,Aqua Démo Engineering,Tinghir,Maintenance,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-017,Terroir Démo Services,Zagora,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-018,Nomad Démo Transport,Tinghir,Travaux hydrauliques,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-019,Data Démo Maroc,Ouarzazate,Logistique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-020,Build Démo Plus,Ouarzazate,Études et assistance technique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-021,Atlas Démo Services 2,Tinghir,Maintenance,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-022,Drâa Démo Travaux 2,Ouarzazate,Aménagement rural,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-023,Sahara Démo Équipements 2,Agdz,Travaux hydrauliques,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-024,Oasis Démo Ingénierie 2,Skoura,Travaux hydrauliques,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-025,Tafilalet Démo Solutions 2,Agdz,Maintenance,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-026,Sud Démo Informatique 2,Boumalne-Dadès,Études et assistance technique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-027,Agri Démo Maroc 2,Agdz,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-028,Hydro Démo Conseil 2,Boumalne-Dadès,Travaux hydrauliques,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-029,Kasbah Démo Construction 2,Ouarzazate,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-030,Palmier Démo Logistique 2,Tinghir,Travaux hydrauliques,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-031,Réseau Démo Technologies 2,Zagora,Travaux hydrauliques,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-032,Valley Démo Maintenance 2,Skoura,Maintenance,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-033,Green Démo Agriculture 2,Skoura,Études et assistance technique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-034,Infra Démo Sud 2,Zagora,Études et assistance technique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-035,Smart Démo Systems 2,Tinghir,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-036,Aqua Démo Engineering 2,Boumalne-Dadès,Maintenance,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-037,Terroir Démo Services 2,Boumalne-Dadès,Travaux hydrauliques,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-038,Nomad Démo Transport 2,Agdz,Équipements agricoles,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-039,Data Démo Maroc 2,Agdz,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-040,Build Démo Plus 2,Zagora,Aménagement rural,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-041,Atlas Démo Services 3,Skoura,Maintenance,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-042,Drâa Démo Travaux 3,Boumalne-Dadès,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-043,Sahara Démo Équipements 3,Boumalne-Dadès,Études et assistance technique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-044,Oasis Démo Ingénierie 3,Ouarzazate,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-045,Tafilalet Démo Solutions 3,Ouarzazate,Études et assistance technique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-046,Sud Démo Informatique 3,Skoura,Maintenance,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-047,Agri Démo Maroc 3,Ouarzazate,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-048,Hydro Démo Conseil 3,Agdz,Études et assistance technique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-049,Kasbah Démo Construction 3,Zagora,Aménagement rural,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-050,Palmier Démo Logistique 3,Skoura,Aménagement rural,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-051,Réseau Démo Technologies 3,Zagora,Maintenance,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-052,Valley Démo Maintenance 3,Zagora,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-053,Green Démo Agriculture 3,Boumalne-Dadès,Maintenance,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-054,Infra Démo Sud 3,Boumalne-Dadès,Logistique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-055,Smart Démo Systems 3,Agdz,Logistique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-056,Aqua Démo Engineering 3,Tinghir,Informatique,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-057,Terroir Démo Services 3,Zagora,Aménagement rural,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-058,Nomad Démo Transport 3,Ouarzazate,Irrigation,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-059,Data Démo Maroc 3,Ouarzazate,Équipements agricoles,ACTIF,SYNTHETIQUE_DEMONSTRATION
+FOUR-060,Build Démo Plus 3,Boumalne-Dadès,Équipements agricoles,ACTIF,SYNTHETIQUE_DEMONSTRATION

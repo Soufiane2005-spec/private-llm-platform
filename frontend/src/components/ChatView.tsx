@@ -2,12 +2,23 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 
 import { sendChatMessage } from '../api/chat'
-import type { ChatMessage } from '../types/chat'
+import type {
+  ChatMessage,
+  ChatSource,
+} from '../types/chat'
 
 const DEFAULT_MODEL = 'qwen2.5:1.5b'
 
 function createMessageId(): string {
   return crypto.randomUUID()
+}
+
+function formatSourceLabel(source: ChatSource): string {
+  if (source.page !== null) {
+    return `${source.source} — page ${source.page}`
+  }
+
+  return source.source
 }
 
 export function ChatView() {
@@ -17,7 +28,9 @@ export function ChatView() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault()
 
     const cleanMessage = message.trim()
@@ -59,6 +72,8 @@ export function ChatView() {
         assistantMessage,
       ])
     } catch (err) {
+      console.error('Chat request failed:', err)
+
       setError(
         err instanceof Error
           ? err.message
@@ -70,6 +85,10 @@ export function ChatView() {
   }
 
   function clearConversation() {
+    if (sending) {
+      return
+    }
+
     setMessages([])
     setError(null)
   }
@@ -78,39 +97,64 @@ export function ChatView() {
     <>
       <section className="hero">
         <div>
-          <p className="eyebrow">Private RAG inference</p>
-          <h1>ORMVAO Knowledge Assistant</h1>
+          <p className="eyebrow">
+            Private RAG inference
+          </p>
+
+          <h1>
+            ORMVAO Knowledge Assistant
+          </h1>
 
           <p className="hero-copy">
-            Ask questions against the local knowledge base and receive
-            answers grounded in retrieved documentation.
+            Ask questions against the local knowledge base
+            and receive answers grounded in retrieved
+            documentation.
           </p>
         </div>
 
         <div className="summary-card">
-          <span>Architecture</span>
-          <strong>RAG + Ollama</strong>
+          <span>
+            Architecture
+          </span>
+
+          <strong>
+            RAG + Ollama
+          </strong>
         </div>
       </section>
 
       <section className="content">
         <div className="chat-toolbar">
           <div>
-            <p className="eyebrow">Knowledge assistant</p>
-            <h2>Ask the private documentation</h2>
+            <p className="eyebrow">
+              Knowledge assistant
+            </p>
+
+            <h2>
+              Ask the private documentation
+            </h2>
           </div>
 
           <div className="chat-toolbar-actions">
             <label className="chat-model-field">
-              <span>Model</span>
+              <span>
+                Model
+              </span>
 
               <select
                 value={model}
-                onChange={(event) => setModel(event.target.value)}
+                onChange={(event) => {
+                  setModel(event.target.value)
+                  setError(null)
+                }}
                 disabled={sending}
               >
                 <option value="qwen2.5:1.5b">
-                  Qwen 2.5 1.5B
+                  Qwen 2.5 1.5B - Recommended
+                </option>
+
+                <option value="tinyllama">
+                  TinyLlama - Fast Demo
                 </option>
               </select>
             </label>
@@ -119,7 +163,9 @@ export function ChatView() {
               type="button"
               className="chat-clear-button"
               onClick={clearConversation}
-              disabled={messages.length === 0 || sending}
+              disabled={
+                messages.length === 0 || sending
+              }
             >
               Clear
             </button>
@@ -134,13 +180,17 @@ export function ChatView() {
           >
             {messages.length === 0 && (
               <div className="chat-empty-state">
-                <div className="chat-empty-icon">RAG</div>
+                <div className="chat-empty-icon">
+                  RAG
+                </div>
 
-                <h3>Ask the local knowledge base</h3>
+                <h3>
+                  Ask the local knowledge base
+                </h3>
 
                 <p>
-                  The assistant searches local documentation before
-                  generating its answer.
+                  The assistant searches local documentation
+                  before generating its answer.
                 </p>
               </div>
             )}
@@ -148,7 +198,9 @@ export function ChatView() {
             {messages.map((chatMessage) => (
               <div
                 key={chatMessage.id}
-                className={`chat-message chat-message-${chatMessage.role}`}
+                className={
+                  `chat-message chat-message-${chatMessage.role}`
+                }
               >
                 <div className="chat-message-role">
                   {chatMessage.role === 'user'
@@ -157,17 +209,52 @@ export function ChatView() {
                 </div>
 
                 <div className="chat-message-content">
-                  {chatMessage.content}
+                  <p>
+                    {chatMessage.content}
+                  </p>
 
                   {chatMessage.sources &&
                     chatMessage.sources.length > 0 && (
                       <div className="chat-sources">
-                        <strong>Sources</strong>
+                        <strong>
+                          Sources
+                        </strong>
 
                         <ul>
-                          {chatMessage.sources.map((source) => (
-                            <li key={source}>{source}</li>
-                          ))}
+                          {chatMessage.sources.map(
+                            (source, index) => (
+                              <li
+                                key={
+                                  `${source.source}-${source.page ?? 'no-page'}-${index}`
+                                }
+                              >
+                                <div>
+                                  <strong>
+                                    {formatSourceLabel(
+                                      source,
+                                    )}
+                                  </strong>
+                                </div>
+
+                                <div>
+                                  Score:{' '}
+                                  {source.score.toFixed(3)}
+                                </div>
+
+                                {source.content && (
+                                  <p>
+                                    {source.content.length >
+                                    300
+                                      ? `${source.content.slice(
+                                          0,
+                                          300,
+                                        )}...`
+                                      : source.content}
+                                  </p>
+                                )}
+                              </li>
+                            ),
+                          )}
                         </ul>
                       </div>
                     )}
@@ -182,15 +269,25 @@ export function ChatView() {
                 </div>
 
                 <div className="chat-message-content chat-thinking">
-                  Searching documentation and generating response...
+                  Searching documentation and generating
+                  response...
                 </div>
               </div>
             )}
           </div>
 
           {error && (
-            <div className="chat-error" role="alert">
-              {error}
+            <div
+              className="chat-error"
+              role="alert"
+            >
+              <strong>
+                Unable to generate response
+              </strong>
+
+              <p>
+                {error}
+              </p>
             </div>
           )}
 
@@ -200,7 +297,9 @@ export function ChatView() {
           >
             <textarea
               value={message}
-              onChange={(event) => setMessage(event.target.value)}
+              onChange={(event) =>
+                setMessage(event.target.value)
+              }
               placeholder="Ask a question about the available documentation..."
               rows={3}
               maxLength={10_000}
@@ -215,9 +314,13 @@ export function ChatView() {
               <button
                 type="submit"
                 className="chat-send-button"
-                disabled={!message.trim() || sending}
+                disabled={
+                  !message.trim() || sending
+                }
               >
-                {sending ? 'Generating...' : 'Send'}
+                {sending
+                  ? 'Generating...'
+                  : 'Send'}
               </button>
             </div>
           </form>
