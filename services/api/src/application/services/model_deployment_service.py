@@ -6,12 +6,22 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from uuid import uuid4
 
 from application.ports.job_repository import JobRepository
-from application.ports.model_deployment_manager import ModelDeploymentManager
-from application.ports.model_deployment_repository import ModelDeploymentRepository
+from application.ports.model_deployment_manager import (
+    ModelDeploymentManager,
+)
+from application.ports.model_deployment_repository import (
+    ModelDeploymentRepository,
+)
 from application.services.job_service import JobService
-from application.services.model_catalog import ModelCatalog, ModelNotFoundError
+from application.services.model_catalog import (
+    ModelCatalog,
+    ModelNotFoundError,
+)
 from domain.jobs.job import Job
-from domain.models.deployment import ModelDeployment, ModelDeploymentStatus
+from domain.models.deployment import (
+    ModelDeployment,
+    ModelDeploymentStatus,
+)
 from domain.models.llm_engine import LLMEngine
 
 
@@ -23,10 +33,14 @@ class SingleActiveVllmError(RuntimeError):
     """Raised when another vLLM deployment already owns the GPU."""
 
 
+class DuplicateActiveDeploymentError(RuntimeError):
+    """Raised when the same model already has an active deployment."""
+
+
 class ModelDeploymentService:
     """Coordinate model deployment persistence, jobs, and runtime changes."""
 
-    _ACTIVE_VLLM_STATUSES = {
+    _ACTIVE_STATUSES = {
         ModelDeploymentStatus.DEPLOYING,
         ModelDeploymentStatus.LOADING,
         ModelDeploymentStatus.RUNNING,
@@ -43,7 +57,9 @@ class ModelDeploymentService:
         timeout_seconds: float = 120.0,
     ) -> None:
         if timeout_seconds <= 0:
-            raise ValueError("timeout_seconds must be greater than zero.")
+            raise ValueError(
+                "timeout_seconds must be greater than zero."
+            )
 
         self._deployments = deployments
         self._manager = manager
@@ -52,30 +68,60 @@ class ModelDeploymentService:
         self._model_catalog = model_catalog
         self._timeout_seconds = timeout_seconds
 
-    def list_deployments(self) -> tuple[ModelDeployment, ...]:
+    def list_deployments(
+        self,
+    ) -> tuple[ModelDeployment, ...]:
         """Return all tracked deployments."""
 
-        return tuple(self._refresh_status(deployment) for deployment in self._deployments.list())
+        return tuple(
+            self._refresh_status(deployment)
+            for deployment in self._deployments.list()
+        )
 
-    def get_deployment(self, deployment_id: str) -> ModelDeployment | None:
+    def get_deployment(
+        self,
+        deployment_id: str,
+    ) -> ModelDeployment | None:
         """Return one deployment by identifier."""
 
-        deployment = self._deployments.get(deployment_id)
+        deployment = self._deployments.get(
+            deployment_id
+        )
+
         if deployment is None:
             return None
+
         return self._refresh_status(deployment)
 
-    def deploy(self, model: str, engine: LLMEngine) -> tuple[ModelDeployment, Job]:
-        """Create a deployment and submit its asynchronous deployment job."""
+    def deploy(
+        self,
+        model: str,
+        engine: LLMEngine,
+    ) -> tuple[ModelDeployment, Job]:
+        """Create a deployment and submit its deployment job."""
 
-        catalog_entry = self._catalog_entry_for(model, engine)
+        catalog_entry = self._catalog_entry_for(
+            model,
+            engine,
+        )
+
+        resolved_model = (
+            catalog_entry.model_id
+            if catalog_entry is not None
+            else model.strip()
+        )
+
+        self._ensure_no_duplicate_active_deployment(
+            model=resolved_model,
+            engine=engine,
+        )
 
         if engine is LLMEngine.VLLM:
             self._ensure_single_active_vllm()
 
         deployment = ModelDeployment(
             deployment_id=str(uuid4()),
-            model=catalog_entry.model_id if catalog_entry is not None else model.strip(),
+            model=resolved_model,
             engine=engine,
             status=ModelDeploymentStatus.DEPLOYING,
             runtime_state="deployment-job-submitted",
@@ -85,12 +131,24 @@ class ModelDeploymentService:
         job = self._submit_operation_job(
             f"deploy-model:{deployment.deployment_id}",
         )
+
         return deployment, job
 
-    def start(self, deployment_id: str) -> tuple[ModelDeployment, Job]:
+    def start(
+        self,
+        deployment_id: str,
+    ) -> tuple[ModelDeployment, Job]:
         """Submit an asynchronous deployment start job."""
 
-        deployment = self._require_deployment(deployment_id)
+        deployment = self._require_deployment(
+            deployment_id
+        )
+
+        self._ensure_no_duplicate_active_deployment(
+            model=deployment.model,
+            engine=deployment.engine,
+            exclude_deployment_id=deployment_id,
+        )
 
         if deployment.engine is LLMEngine.VLLM:
             self._ensure_single_active_vllm(
@@ -103,30 +161,51 @@ class ModelDeploymentService:
             gpu_available=deployment.gpu_available,
         )
         self._deployments.save(pending)
+
         job = self._submit_operation_job(
             f"start-model:{deployment_id}",
         )
+
         return pending, job
 
-    def stop(self, deployment_id: str) -> tuple[ModelDeployment, Job]:
+    def stop(
+        self,
+        deployment_id: str,
+    ) -> tuple[ModelDeployment, Job]:
         """Submit an asynchronous deployment stop job."""
 
-        deployment = self._require_deployment(deployment_id)
+        deployment = self._require_deployment(
+            deployment_id
+        )
+
         pending = deployment.with_status(
             deployment.status,
             runtime_state="stop-job-submitted",
             gpu_available=deployment.gpu_available,
         )
         self._deployments.save(pending)
+
         job = self._submit_operation_job(
             f"stop-model:{deployment_id}",
         )
+
         return pending, job
 
-    def restart(self, deployment_id: str) -> tuple[ModelDeployment, Job]:
+    def restart(
+        self,
+        deployment_id: str,
+    ) -> tuple[ModelDeployment, Job]:
         """Submit an asynchronous deployment restart job."""
 
-        deployment = self._require_deployment(deployment_id)
+        deployment = self._require_deployment(
+            deployment_id
+        )
+
+        self._ensure_no_duplicate_active_deployment(
+            model=deployment.model,
+            engine=deployment.engine,
+            exclude_deployment_id=deployment_id,
+        )
 
         if deployment.engine is LLMEngine.VLLM:
             self._ensure_single_active_vllm(
@@ -139,28 +218,47 @@ class ModelDeploymentService:
             gpu_available=deployment.gpu_available,
         )
         self._deployments.save(pending)
+
         job = self._submit_operation_job(
             f"restart-model:{deployment_id}",
         )
+
         return pending, job
 
-    def delete(self, deployment_id: str) -> Job:
+    def delete(
+        self,
+        deployment_id: str,
+    ) -> Job:
         """Submit an asynchronous deployment delete job."""
 
-        deployment = self._require_deployment(deployment_id)
+        deployment = self._require_deployment(
+            deployment_id
+        )
+
         if deployment.status not in {
             ModelDeploymentStatus.FAILED,
             ModelDeploymentStatus.STOPPED,
         }:
             raise ValueError(
-                "Only failed or stopped deployments can be deleted. Stop it first."
+                "Only failed or stopped deployments can "
+                "be deleted. Stop it first."
             )
-        return self._submit_operation_job(f"delete-model:{deployment_id}")
 
-    def execute_deploy(self, deployment_id: str, job_id: str) -> Job:
+        return self._submit_operation_job(
+            f"delete-model:{deployment_id}"
+        )
+
+    def execute_deploy(
+        self,
+        deployment_id: str,
+        job_id: str,
+    ) -> Job:
         """Run a submitted deployment job."""
 
-        deployment = self._require_deployment(deployment_id)
+        deployment = self._require_deployment(
+            deployment_id
+        )
+
         return self._execute_job(
             job_id,
             lambda: self._manager.deploy(deployment),
@@ -168,10 +266,17 @@ class ModelDeploymentService:
             failure_deployment_id=deployment_id,
         )
 
-    def execute_start(self, deployment_id: str, job_id: str) -> Job:
+    def execute_start(
+        self,
+        deployment_id: str,
+        job_id: str,
+    ) -> Job:
         """Run a submitted deployment start job."""
 
-        deployment = self._require_deployment(deployment_id)
+        deployment = self._require_deployment(
+            deployment_id
+        )
+
         return self._execute_job(
             job_id,
             lambda: self._manager.start(deployment),
@@ -179,10 +284,17 @@ class ModelDeploymentService:
             failure_deployment_id=deployment_id,
         )
 
-    def execute_stop(self, deployment_id: str, job_id: str) -> Job:
+    def execute_stop(
+        self,
+        deployment_id: str,
+        job_id: str,
+    ) -> Job:
         """Run a submitted deployment stop job."""
 
-        deployment = self._require_deployment(deployment_id)
+        deployment = self._require_deployment(
+            deployment_id
+        )
+
         return self._execute_job(
             job_id,
             lambda: self._manager.stop(deployment),
@@ -190,35 +302,65 @@ class ModelDeploymentService:
             failure_deployment_id=deployment_id,
         )
 
-    def execute_restart(self, deployment_id: str, job_id: str) -> Job:
+    def execute_restart(
+        self,
+        deployment_id: str,
+        job_id: str,
+    ) -> Job:
         """Run a submitted deployment restart job."""
 
-        deployment = self._require_deployment(deployment_id)
+        deployment = self._require_deployment(
+            deployment_id
+        )
+
         return self._execute_job(
             job_id,
-            lambda: self._manager.restart(deployment),
+            lambda: self._manager.restart(
+                deployment
+            ),
             save_deployment=True,
             failure_deployment_id=deployment_id,
         )
 
-    def execute_delete(self, deployment_id: str, job_id: str) -> Job:
+    def execute_delete(
+        self,
+        deployment_id: str,
+        job_id: str,
+    ) -> Job:
         """Run a submitted deployment delete job."""
 
-        deployment = self._require_deployment(deployment_id)
+        deployment = self._require_deployment(
+            deployment_id
+        )
 
         def operation() -> None:
             self._manager.delete(deployment)
-            self._deployments.delete(deployment_id)
+            self._deployments.delete(
+                deployment_id
+            )
 
-        return self._execute_job(job_id, operation, save_deployment=False)
+        return self._execute_job(
+            job_id,
+            operation,
+            save_deployment=False,
+        )
 
-    def _submit_operation_job(self, job_type: str) -> Job:
-        return self._jobs.submit(job_type, enqueue=False)
+    def _submit_operation_job(
+        self,
+        job_type: str,
+    ) -> Job:
+        return self._jobs.submit(
+            job_type,
+            enqueue=False,
+        )
 
     def _execute_job(
         self,
         job_id: str,
-        operation: Callable[[], ModelDeployment | None],
+        operation: Callable[
+            [],
+            ModelDeployment | None,
+        ],
         *,
         save_deployment: bool,
         failure_deployment_id: str | None = None,
@@ -226,78 +368,153 @@ class ModelDeploymentService:
         job = self._require_job(job_id)
 
         while job.can_retry:
-            running = job.register_attempt().mark_running()
+            running = (
+                job.register_attempt()
+                .mark_running()
+            )
             self._job_repository.save(running)
 
             try:
-                updated = self._execute_with_timeout(operation)
+                updated = self._execute_with_timeout(
+                    operation
+                )
 
-                if save_deployment and updated is not None:
+                if (
+                    save_deployment
+                    and updated is not None
+                ):
                     self._deployments.save(updated)
 
                     if updated.error:
-                        raise RuntimeError(updated.error)
+                        raise RuntimeError(
+                            updated.error
+                        )
 
             except Exception as exc:
                 if running.can_retry:
-                    job = running.mark_retry_pending()
+                    job = (
+                        running.mark_retry_pending()
+                    )
                     self._job_repository.save(job)
                     continue
 
-                if save_deployment and failure_deployment_id is not None:
+                if (
+                    save_deployment
+                    and failure_deployment_id
+                    is not None
+                ):
                     self._mark_deployment_failed(
                         failure_deployment_id,
                         error=str(exc),
                     )
 
-                failed = running.mark_failed(str(exc))
+                failed = running.mark_failed(
+                    str(exc)
+                )
                 self._job_repository.save(failed)
                 return failed
 
             completed = running.mark_completed()
             self._job_repository.save(completed)
+
             return completed
 
-        raise RuntimeError("job has no retry attempts remaining.")
+        raise RuntimeError(
+            "job has no retry attempts remaining."
+        )
 
-    def _require_deployment(self, deployment_id: str) -> ModelDeployment:
-        deployment = self._deployments.get(deployment_id)
+    def _require_deployment(
+        self,
+        deployment_id: str,
+    ) -> ModelDeployment:
+        deployment = self._deployments.get(
+            deployment_id
+        )
 
         if deployment is None:
-            raise KeyError("Deployment not found.")
+            raise KeyError(
+                "Deployment not found."
+            )
 
         return deployment
+
+    def _ensure_no_duplicate_active_deployment(
+        self,
+        *,
+        model: str,
+        engine: LLMEngine,
+        exclude_deployment_id: str | None = None,
+    ) -> None:
+        """Reject an active duplicate of the same model."""
+
+        for deployment in self._deployments.list():
+            if deployment.engine is not engine:
+                continue
+
+            if deployment.model != model:
+                continue
+
+            if (
+                exclude_deployment_id is not None
+                and deployment.deployment_id
+                == exclude_deployment_id
+            ):
+                continue
+
+            if deployment.status in self._ACTIVE_STATUSES:
+                raise DuplicateActiveDeploymentError(
+                    f"Model '{model}' already has an "
+                    f"active {engine.value} deployment."
+                )
 
     def _ensure_single_active_vllm(
         self,
         *,
         exclude_deployment_id: str | None = None,
     ) -> None:
-        """Ensure that no other vLLM deployment currently owns the GPU."""
+        """Ensure no other vLLM deployment owns the GPU."""
 
         for deployment in self._deployments.list():
-            if deployment.engine is not LLMEngine.VLLM:
+            if (
+                deployment.engine
+                is not LLMEngine.VLLM
+            ):
                 continue
 
             if (
                 exclude_deployment_id is not None
-                and deployment.deployment_id == exclude_deployment_id
+                and deployment.deployment_id
+                == exclude_deployment_id
             ):
                 continue
 
-            if deployment.status in self._ACTIVE_VLLM_STATUSES:
+            if (
+                deployment.status
+                in self._ACTIVE_STATUSES
+            ):
                 raise SingleActiveVllmError(
-                    "Another vLLM model is already active. "
-                    "Stop it before deploying this model."
+                    "Another vLLM model is already "
+                    "active. Stop it before deploying "
+                    "this model."
                 )
 
-    def _mark_deployment_failed(self, deployment_id: str, *, error: str) -> None:
-        deployment = self._deployments.get(deployment_id)
+    def _mark_deployment_failed(
+        self,
+        deployment_id: str,
+        *,
+        error: str,
+    ) -> None:
+        deployment = self._deployments.get(
+            deployment_id
+        )
 
         if deployment is None:
             return
 
-        if deployment.status is ModelDeploymentStatus.FAILED:
+        if (
+            deployment.status
+            is ModelDeploymentStatus.FAILED
+        ):
             return
 
         failed = deployment.with_status(
@@ -308,7 +525,10 @@ class ModelDeploymentService:
         )
         self._deployments.save(failed)
 
-    def _refresh_status(self, deployment: ModelDeployment) -> ModelDeployment:
+    def _refresh_status(
+        self,
+        deployment: ModelDeployment,
+    ) -> ModelDeployment:
         if deployment.runtime_state in {
             "deployment-job-submitted",
             "start-job-submitted",
@@ -318,7 +538,9 @@ class ModelDeploymentService:
             return deployment
 
         try:
-            refreshed = self._manager.status(deployment)
+            refreshed = self._manager.status(
+                deployment
+            )
         except Exception:
             return deployment
 
@@ -327,11 +549,16 @@ class ModelDeploymentService:
 
         return refreshed
 
-    def _catalog_entry_for(self, model: str, engine: LLMEngine):
+    def _catalog_entry_for(
+        self,
+        model: str,
+        engine: LLMEngine,
+    ):
         if self._model_catalog is None:
             return None
 
         stripped = model.strip()
+
         for entry in self._model_catalog.list_models():
             if entry.engine is not engine:
                 continue
@@ -341,39 +568,60 @@ class ModelDeploymentService:
                 entry.engine_model_id,
                 entry.benchmark_model_id,
             }
+
             if stripped in identifiers:
                 return entry
 
         try:
-            return self._model_catalog.get(stripped)
+            return self._model_catalog.get(
+                stripped
+            )
         except ModelNotFoundError:
             return None
 
-    def _require_job(self, job_id: str) -> Job:
+    def _require_job(
+        self,
+        job_id: str,
+    ) -> Job:
         job = self._job_repository.get(job_id)
 
         if job is None:
-            raise KeyError("Job not found.")
+            raise KeyError(
+                "Job not found."
+            )
 
         return job
 
     def _execute_with_timeout(
         self,
-        operation: Callable[[], ModelDeployment | None],
+        operation: Callable[
+            [],
+            ModelDeployment | None,
+        ],
     ) -> ModelDeployment | None:
-        executor = ThreadPoolExecutor(max_workers=1)
-        future = executor.submit(operation)
+        executor = ThreadPoolExecutor(
+            max_workers=1
+        )
+
+        future = executor.submit(
+            operation
+        )
 
         try:
-            return future.result(timeout=self._timeout_seconds)
+            return future.result(
+                timeout=self._timeout_seconds
+            )
 
         except FuturesTimeoutError as exc:
             future.cancel()
 
             raise ModelDeploymentJobTimeoutError(
-                f"model operation exceeded timeout of "
-                f"{self._timeout_seconds} seconds"
+                "model operation exceeded timeout "
+                f"of {self._timeout_seconds} seconds"
             ) from exc
 
         finally:
-            executor.shutdown(wait=False, cancel_futures=True)
+            executor.shutdown(
+                wait=False,
+                cancel_futures=True,
+            )

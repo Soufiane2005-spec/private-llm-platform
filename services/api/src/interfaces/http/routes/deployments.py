@@ -2,11 +2,18 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    status,
+)
 
 from application.services.job_service import JobService
 from application.services.model_catalog import ModelCatalog
 from application.services.model_deployment_service import (
+    DuplicateActiveDeploymentError,
     ModelDeploymentService,
     SingleActiveVllmError,
 )
@@ -27,8 +34,13 @@ from infrastructure.persistence.factory import (
     get_persistent_job_repository,
     get_persistent_model_catalog_repository,
 )
-from infrastructure.queue.in_memory_job_queue import InMemoryJobQueue
-from interfaces.http.dependencies.auth import EngineerUserDependency, ViewerUserDependency
+from infrastructure.queue.in_memory_job_queue import (
+    InMemoryJobQueue,
+)
+from interfaces.http.dependencies.auth import (
+    EngineerUserDependency,
+    ViewerUserDependency,
+)
 from interfaces.http.schemas.deployments import (
     DeploymentCreateRequest,
     DeploymentJobResponse,
@@ -36,18 +48,36 @@ from interfaces.http.schemas.deployments import (
     DeploymentResponse,
 )
 
-router = APIRouter(prefix="/deployments", tags=["deployments"])
+router = APIRouter(
+    prefix="/deployments",
+    tags=["deployments"],
+)
 
-_deployment_repository = get_persistent_deployment_repository()
+
+_deployment_repository = (
+    get_persistent_deployment_repository()
+)
+
 _job_repository = get_persistent_job_repository()
+
 _job_queue = InMemoryJobQueue()
-_job_service = JobService(queue=_job_queue, repository=_job_repository)
+
+_job_service = JobService(
+    queue=_job_queue,
+    repository=_job_repository,
+)
+
 _settings = get_settings()
-_catalog = ModelCatalog(repository=get_persistent_model_catalog_repository())
+
+_catalog = ModelCatalog(
+    repository=get_persistent_model_catalog_repository(),
+)
+
 _local_deployment_manager = LocalModelDeploymentManager(
     gpu_available=False,
     model_catalog=_catalog,
 )
+
 _runtime_deployment_manager = (
     RoutedModelDeploymentManager(
         ollama_manager=_local_deployment_manager,
@@ -60,13 +90,17 @@ _runtime_deployment_manager = (
     if _settings.model_deployment_backend == "kubernetes"
     else _local_deployment_manager
 )
+
 _deployment_service = ModelDeploymentService(
     deployments=_deployment_repository,
     manager=_runtime_deployment_manager,
     jobs=_job_service,
     job_repository=_job_repository,
     model_catalog=_catalog,
-    timeout_seconds=max(_settings.model_operation_timeout_seconds, 900.0),
+    timeout_seconds=max(
+        _settings.model_operation_timeout_seconds,
+        900.0,
+    ),
 )
 
 
@@ -82,7 +116,9 @@ DeploymentServiceDependency = Annotated[
 ]
 
 
-def _deployment_response(deployment: ModelDeployment) -> DeploymentResponse:
+def _deployment_response(
+    deployment: ModelDeployment,
+) -> DeploymentResponse:
     return DeploymentResponse(
         deployment_id=deployment.deployment_id,
         model=deployment.model,
@@ -94,7 +130,9 @@ def _deployment_response(deployment: ModelDeployment) -> DeploymentResponse:
     )
 
 
-def _job_response(job: Job) -> DeploymentJobResponse:
+def _job_response(
+    job: Job,
+) -> DeploymentJobResponse:
     return DeploymentJobResponse(
         job_id=job.job_id,
         status=job.status,
@@ -107,12 +145,19 @@ def _operation_response(
     job: Job,
 ) -> DeploymentOperationResponse:
     return DeploymentOperationResponse(
-        deployment=None if deployment is None else _deployment_response(deployment),
+        deployment=(
+            None
+            if deployment is None
+            else _deployment_response(deployment)
+        ),
         job=_job_response(job),
     )
 
 
-@router.get("", response_model=list[DeploymentResponse])
+@router.get(
+    "",
+    response_model=list[DeploymentResponse],
+)
 def list_deployments(
     _user: ViewerUserDependency,
     service: DeploymentServiceDependency,
@@ -143,10 +188,21 @@ def deploy_model(
             model=request.model,
             engine=request.engine,
         )
-    except SingleActiveVllmError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    except (
+        DuplicateActiveDeploymentError,
+        SingleActiveVllmError,
+    ) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
+
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
 
     background_tasks.add_task(
         service.execute_deploy,
@@ -154,10 +210,16 @@ def deploy_model(
         job.job_id,
     )
 
-    return _operation_response(deployment, job)
+    return _operation_response(
+        deployment,
+        job,
+    )
 
 
-@router.get("/{deployment_id}", response_model=DeploymentResponse)
+@router.get(
+    "/{deployment_id}",
+    response_model=DeploymentResponse,
+)
 def get_deployment(
     deployment_id: str,
     _user: ViewerUserDependency,
@@ -165,15 +227,25 @@ def get_deployment(
 ) -> DeploymentResponse:
     """Return one model deployment."""
 
-    deployment = service.get_deployment(deployment_id)
+    deployment = service.get_deployment(
+        deployment_id
+    )
 
     if deployment is None:
-        raise HTTPException(status_code=404, detail="Deployment not found.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deployment not found.",
+        )
 
-    return _deployment_response(deployment)
+    return _deployment_response(
+        deployment
+    )
 
 
-@router.post("/{deployment_id}/start", response_model=DeploymentOperationResponse)
+@router.post(
+    "/{deployment_id}/start",
+    response_model=DeploymentOperationResponse,
+)
 def start_deployment(
     deployment_id: str,
     background_tasks: BackgroundTasks,
@@ -183,18 +255,41 @@ def start_deployment(
     """Start a model deployment."""
 
     try:
-        deployment, job = service.start(deployment_id)
+        deployment, job = service.start(
+            deployment_id
+        )
+
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Deployment not found.") from exc
-    except SingleActiveVllmError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deployment not found.",
+        ) from exc
 
-    background_tasks.add_task(service.execute_start, deployment_id, job.job_id)
+    except (
+        DuplicateActiveDeploymentError,
+        SingleActiveVllmError,
+    ) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
-    return _operation_response(deployment, job)
+    background_tasks.add_task(
+        service.execute_start,
+        deployment_id,
+        job.job_id,
+    )
+
+    return _operation_response(
+        deployment,
+        job,
+    )
 
 
-@router.post("/{deployment_id}/stop", response_model=DeploymentOperationResponse)
+@router.post(
+    "/{deployment_id}/stop",
+    response_model=DeploymentOperationResponse,
+)
 def stop_deployment(
     deployment_id: str,
     background_tasks: BackgroundTasks,
@@ -204,16 +299,32 @@ def stop_deployment(
     """Stop a model deployment."""
 
     try:
-        deployment, job = service.stop(deployment_id)
+        deployment, job = service.stop(
+            deployment_id
+        )
+
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Deployment not found.") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deployment not found.",
+        ) from exc
 
-    background_tasks.add_task(service.execute_stop, deployment_id, job.job_id)
+    background_tasks.add_task(
+        service.execute_stop,
+        deployment_id,
+        job.job_id,
+    )
 
-    return _operation_response(deployment, job)
+    return _operation_response(
+        deployment,
+        job,
+    )
 
 
-@router.post("/{deployment_id}/restart", response_model=DeploymentOperationResponse)
+@router.post(
+    "/{deployment_id}/restart",
+    response_model=DeploymentOperationResponse,
+)
 def restart_deployment(
     deployment_id: str,
     background_tasks: BackgroundTasks,
@@ -223,18 +334,41 @@ def restart_deployment(
     """Restart a model deployment."""
 
     try:
-        deployment, job = service.restart(deployment_id)
+        deployment, job = service.restart(
+            deployment_id
+        )
+
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Deployment not found.") from exc
-    except SingleActiveVllmError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deployment not found.",
+        ) from exc
 
-    background_tasks.add_task(service.execute_restart, deployment_id, job.job_id)
+    except (
+        DuplicateActiveDeploymentError,
+        SingleActiveVllmError,
+    ) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
-    return _operation_response(deployment, job)
+    background_tasks.add_task(
+        service.execute_restart,
+        deployment_id,
+        job.job_id,
+    )
+
+    return _operation_response(
+        deployment,
+        job,
+    )
 
 
-@router.delete("/{deployment_id}", response_model=DeploymentOperationResponse)
+@router.delete(
+    "/{deployment_id}",
+    response_model=DeploymentOperationResponse,
+)
 def delete_deployment(
     deployment_id: str,
     background_tasks: BackgroundTasks,
@@ -244,12 +378,29 @@ def delete_deployment(
     """Delete a model deployment."""
 
     try:
-        job = service.delete(deployment_id)
+        job = service.delete(
+            deployment_id
+        )
+
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Deployment not found.") from exc
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deployment not found.",
+        ) from exc
+
     except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(exc),
+        ) from exc
 
-    background_tasks.add_task(service.execute_delete, deployment_id, job.job_id)
+    background_tasks.add_task(
+        service.execute_delete,
+        deployment_id,
+        job.job_id,
+    )
 
-    return _operation_response(None, job)
+    return _operation_response(
+        None,
+        job,
+    )

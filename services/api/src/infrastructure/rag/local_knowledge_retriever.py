@@ -18,7 +18,6 @@ from pathlib import Path
 
 from application.ports.knowledge_retriever import KnowledgeMatch
 
-
 DEFAULT_KNOWLEDGE_DIRECTORY = (
     Path(__file__).resolve().parents[3]
     / "data"
@@ -989,11 +988,11 @@ class LocalKnowledgeRetriever:
 
         if total > len(selected_rows):
             lines.append(
-                (
+                
                     f"{total - len(selected_rows)} "
                     "autres résultats correspondent également "
                     "à la recherche."
-                )
+                
             )
 
         return KnowledgeMatch(

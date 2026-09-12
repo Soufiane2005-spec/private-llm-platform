@@ -17,7 +17,6 @@ from application.services.model_runtime_availability import (
 from domain.models.llm_engine import LLMEngine
 from domain.models.model_catalog import ModelCatalogEntry
 
-
 NO_INFORMATION_REPLY = (
     "Je n'ai pas trouvé cette information "
     "dans la documentation disponible."

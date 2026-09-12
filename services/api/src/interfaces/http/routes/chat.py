@@ -2,19 +2,28 @@
 
 from fastapi import APIRouter, HTTPException, status
 
-from application.services.knowledge_ingestion_service import KnowledgeIngestionService
+from application.services.knowledge_ingestion_service import (
+    KnowledgeIngestionService,
+)
 from application.services.model_catalog import ModelCatalog
-from application.services.model_runtime_availability import ModelRuntimeAvailability
+from application.services.model_runtime_availability import (
+    ModelRuntimeAvailability,
+)
 from application.services.rag_chat_service import RagChatService
 from infrastructure.config import get_settings
 from infrastructure.llm.ollama_chat_model import (
     OllamaChatError,
     OllamaChatModel,
 )
-from infrastructure.persistence.factory import get_persistent_model_catalog_repository
+from infrastructure.persistence.factory import (
+    get_persistent_model_catalog_repository,
+)
 from infrastructure.rag.local_knowledge_retriever import (
     DEFAULT_KNOWLEDGE_DIRECTORY,
     LocalKnowledgeRetriever,
+)
+from interfaces.http.dependencies.auth import (
+    EngineerUserDependency,
 )
 from interfaces.http.schemas.chat import (
     ChatRequest,
@@ -40,7 +49,7 @@ def _build_chat_service() -> RagChatService:
         ),
         knowledge_retriever=LocalKnowledgeRetriever(),
         model_catalog=ModelCatalog(
-            repository=get_persistent_model_catalog_repository()
+            repository=get_persistent_model_catalog_repository(),
         ),
         runtime_availability=ModelRuntimeAvailability(
             ollama_base_url=settings.ollama_base_url,
@@ -51,14 +60,19 @@ def _build_chat_service() -> RagChatService:
 
 
 _chat_service = _build_chat_service()
-_ingestion_service = KnowledgeIngestionService(DEFAULT_KNOWLEDGE_DIRECTORY)
+
+_ingestion_service = KnowledgeIngestionService(
+    DEFAULT_KNOWLEDGE_DIRECTORY,
+)
 
 
 @router.post(
     "",
     response_model=ChatResponse,
 )
-def chat(request: ChatRequest) -> ChatResponse:
+def chat(
+    request: ChatRequest,
+) -> ChatResponse:
     """Generate a response grounded in local documentation."""
 
     try:
@@ -66,11 +80,13 @@ def chat(request: ChatRequest) -> ChatResponse:
             model=request.model,
             message=request.message,
         )
+
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
     except OllamaChatError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -98,14 +114,22 @@ def chat(request: ChatRequest) -> ChatResponse:
     response_model=KnowledgeIngestResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def ingest_knowledge(request: KnowledgeIngestRequest) -> KnowledgeIngestResponse:
-    """Explicitly add a text document to the local RAG knowledge base."""
+def ingest_knowledge(
+    request: KnowledgeIngestRequest,
+    _user: EngineerUserDependency,
+) -> KnowledgeIngestResponse:
+    """Add a document to the private knowledge base.
+
+    Only administrators and engineers may modify the
+    platform knowledge base.
+    """
 
     try:
         result = _ingestion_service.ingest_text(
             source=request.source,
             content=request.content,
         )
+
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

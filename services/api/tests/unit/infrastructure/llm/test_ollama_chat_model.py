@@ -49,15 +49,26 @@ def test_generate_reply_returns_ollama_response(
     ) -> FakeResponse:
         assert url == "http://127.0.0.1:11434/api/chat"
         assert timeout == 120.0
-        assert json == {
-            "model": "qwen2.5:1.5b",
-            "messages": [
-                {
-                    "role": "user",
-                    "content": "Bonjour",
-                }
-            ],
-            "stream": False,
+
+        assert json["model"] == "qwen2.5:1.5b"
+        assert json["stream"] is False
+
+        assert json["options"] == {
+            "temperature": 0.1,
+            "num_predict": 120,
+            "num_ctx": 2048,
+        }
+
+        messages = json["messages"]
+
+        assert len(messages) == 2
+
+        assert messages[0]["role"] == "system"
+        assert "ORMVAO" in messages[0]["content"]
+
+        assert messages[1] == {
+            "role": "user",
+            "content": "Bonjour",
         }
 
         return FakeResponse(
@@ -68,7 +79,11 @@ def test_generate_reply_returns_ollama_response(
             }
         )
 
-    monkeypatch.setattr(httpx, "post", fake_post)
+    monkeypatch.setattr(
+        httpx,
+        "post",
+        fake_post,
+    )
 
     model = OllamaChatModel()
 
@@ -102,7 +117,11 @@ def test_generate_reply_uses_custom_base_url_and_timeout(
             }
         )
 
-    monkeypatch.setattr(httpx, "post", fake_post)
+    monkeypatch.setattr(
+        httpx,
+        "post",
+        fake_post,
+    )
 
     model = OllamaChatModel(
         base_url="http://ollama:11434/",
@@ -130,10 +149,17 @@ def test_generate_reply_maps_http_errors(
     ) -> FakeResponse:
         raise httpx.ConnectError(
             "Connection refused",
-            request=httpx.Request("POST", url),
+            request=httpx.Request(
+                "POST",
+                url,
+            ),
         )
 
-    monkeypatch.setattr(httpx, "post", fake_post)
+    monkeypatch.setattr(
+        httpx,
+        "post",
+        fake_post,
+    )
 
     model = OllamaChatModel()
 
@@ -156,7 +182,9 @@ def test_generate_reply_rejects_invalid_response(
         httpx,
         "post",
         lambda *args, **kwargs: FakeResponse(
-            payload={"unexpected": "response"}
+            payload={
+                "unexpected": "response",
+            }
         ),
     )
 
