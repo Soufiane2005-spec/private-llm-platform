@@ -91,6 +91,7 @@ def test_vllm_kubernetes_deployment_is_gpu_and_nonroot_ready() -> None:
     assert env["VLLM_WSL2_ENABLE_PIN_MEMORY"] == "1"
     assert env["HF_HOME"] == "/cache/huggingface"
     assert env["XDG_CACHE_HOME"] == "/cache"
+    assert env["NUMBA_CACHE_DIR"] == "/cache/numba"
     assert env["HOME"] == "/tmp"
 
     args = container["args"]
@@ -108,7 +109,7 @@ def test_vllm_kubernetes_deployment_is_gpu_and_nonroot_ready() -> None:
         for item in container["volumeMounts"]
     }
 
-    assert volume_mounts["model-cache"] == "/cache/huggingface"
+    assert volume_mounts["model-cache"] == "/cache"
     assert volume_mounts["tmp"] == "/tmp"
     assert volume_mounts["dshm"] == "/dev/shm"
 

@@ -229,11 +229,12 @@ def test_deploy_vllm_with_gpu_requests_gpu_resources() -> None:
     assert {"name": "VLLM_WSL2_ENABLE_PIN_MEMORY", "value": "1"} in container["env"]
     assert {"name": "HF_HOME", "value": "/cache/huggingface"} in container["env"]
     assert {"name": "XDG_CACHE_HOME", "value": "/cache"} in container["env"]
+    assert {"name": "NUMBA_CACHE_DIR", "value": "/cache/numba"} in container["env"]
     assert {"name": "HOME", "value": "/tmp"} in container["env"]
 
     assert {
         "name": "model-cache",
-        "mountPath": "/cache/huggingface",
+        "mountPath": "/cache",
     } in container["volumeMounts"]
 
     assert {
