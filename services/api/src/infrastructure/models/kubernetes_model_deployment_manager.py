@@ -367,6 +367,10 @@ class KubernetesModelDeploymentManager:
                     "value": "/cache",
                 },
                 {
+                    "name": "NUMBA_CACHE_DIR",
+                    "value": "/cache/numba",
+                },
+                {
                     "name": "HOME",
                     "value": "/tmp",
                 },
@@ -433,7 +437,7 @@ class KubernetesModelDeploymentManager:
                 },
                 {
                     "name": "model-cache",
-                    "mountPath": "/cache/huggingface",
+                    "mountPath": "/cache",
                 },
                 {
                     "name": "tmp",
